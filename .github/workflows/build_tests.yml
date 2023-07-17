@@ -9,6 +9,7 @@ jobs:
   build:
     name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    environment: Alfred_variables
     strategy:
       fail-fast: false
       matrix:
