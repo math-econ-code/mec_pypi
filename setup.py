@@ -2,11 +2,11 @@ from setuptools import setup, find_packages
 
 setup(
 	name="mec",
-	version="0.0.12",
+	version="0.0.13",
 	url="",
 	authors=["Alfred Galichon"],
 	author_email="ag133@nyu.edu",
-	licence="GNU",
+	licence="",
 	python_requires=">= 3",
 	packages=find_packages(),
     test_suite="mec.tests", 
