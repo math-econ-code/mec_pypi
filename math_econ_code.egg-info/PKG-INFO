@@ -1,0 +1,8 @@
+Metadata-Version: 2.1
+Name: math-econ-code
+Version: 0.0.1
+Summary: description of the package
+Home-page: 
+Author-email: ag133@nyu.edu
+License: GNU
+Requires-Python: >= 3

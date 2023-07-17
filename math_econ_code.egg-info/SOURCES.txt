@@ -1,0 +1,8 @@
+setup.py
+math_econ_code.egg-info/PKG-INFO
+math_econ_code.egg-info/SOURCES.txt
+math_econ_code.egg-info/dependency_links.txt
+math_econ_code.egg-info/top_level.txt
+mec/__init__.py
+mec/lp.py
+mec/tests/__init__.py
