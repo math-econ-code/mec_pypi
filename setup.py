@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-	name="math_econ_code",
+	name="mec",
 	version="0.0.1",
 	url="",
 	authors=["Alfred Galichon"],
