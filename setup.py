@@ -10,5 +10,5 @@ setup(
 	python_requires=">= 3",
 	packages=find_packages(),
     test_suite="mec.tests", 
-	description="description of the package"	# can link markdown file here
+	description="description of the package"	# can link markdown file here 
 )
