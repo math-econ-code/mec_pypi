@@ -16,7 +16,7 @@ class Matrix_game:
 
 	def compute_eq(self):
 		return [ (i,j) for i in range(self.nbi) for j in range(self.nbj)
-				if ( (i in self.BRI(j) ) and (j in self.BRJ(i) ) ) 
+				if ( (i in self.BRI(j) ) and (j in self.BRJ(i) ) ) ]
 				
 	def minimax_LP(self):
 		model=grb.Model()
