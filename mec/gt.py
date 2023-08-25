@@ -36,7 +36,7 @@ class Bimatrix_game:
 		self.B_i_j = B_i_j
 		self.nbi,self.nbj = A_i_j.shape
 
-	def zero_sum_solve(self):
+	def mangasarian_stone_solve(self):
 		model=grb.Model()
 		model.Params.OutputFlag = 0
 		model.params.NonConvex = 2
