@@ -55,6 +55,7 @@ def round_expr(expr, num_digits):
 
 class Tableau():
     def __init__(self, names_basic, names_nonbasic, A_i_j, b_i, c_j): # z = d - A @ x
+        self.A_i_j,self.b_i,self.c_j = A_i_j,b_i,c_j
         self.nonbasic = list(symbols(names_nonbasic))
         self.base = { Symbol('obj') : c_j @ self.nonbasic }
         self.base.update( { list(symbols(names_basic))[i]: b_i[i]  - (A_i_j @ self.nonbasic)[i] for i in range(len(b_i))} )
