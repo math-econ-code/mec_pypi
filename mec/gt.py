@@ -3,10 +3,9 @@ import numpy as np
 
 
 class Matrix_game:
-    def __init__(self,Phi_i_j):
-        self.nbi,self.nbj = Phi_i_j.shape
-        self.Phi_i_j = Phi_i_j
-
+	def __init__(self,Phi_i_j):
+		self.nbi,self.nbj = Phi_i_j.shape
+		self.Phi_i_j = Phi_i_j
 
 	def BRI(self,j):
 		return np.argwhere(self.Phi_i_j[:,j] == np.max(self.Phi_i_j[:,j])).flatten()
@@ -15,9 +14,8 @@ class Matrix_game:
 		return np.argwhere(self.Phi_i_j[i,:] == np.min(self.Phi_i_j[i,:])).flatten()
 
 	def compute_eq(self):
-		return [ (i,j) for i in range(self.nbi) for j in range(self.nbj)
-				if ( (i in self.BRI(j) ) and (j in self.BRJ(i) ) ) ]
-				
+		return [ (i,j) for i in range(self.nbi) for j in range(self.nbj) if ( (i in self.BRI(j) ) and (j in self.BRJ(i) ) ) ]
+
 	def minimax_LP(self):
 		model=grb.Model()
 		model.Params.OutputFlag = 0
