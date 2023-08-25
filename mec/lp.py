@@ -125,7 +125,7 @@ class Tableau():
                 return False # not finished
         return True # finished
 
-    def Tableau_plot_path_so_far(self, the_path, legend=True):
+    def plot_path_so_far(self, the_path, legend=True):
         if self.A_i_j.shape[1] != 2:
             print('Can\'t plot the solution in 2D, the number of primal variables differs from two.')
             return()
