@@ -30,13 +30,13 @@ class Matrix_game:
 		q_j = S * ystar
 		return(p_i,q_j)
 
-class NashEquilibrium:
+class Bimatrix_game:
 	def __init__(self,A_i_j,B_i_j):
 		self.A_i_j = A_i_j
 		self.B_i_j = B_i_j
 		self.nbi,self.nbj = A_i_j.shape
 
-	def NashEquilibrium_zero_sum_solve(self):
+	def zero_sum_solve(self):
 		model=grb.Model()
 		model.Params.OutputFlag = 0
 		model.params.NonConvex = 2
