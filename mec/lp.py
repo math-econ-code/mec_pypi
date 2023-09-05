@@ -13,7 +13,9 @@ from tabulate import tabulate
 # LP1: Intro to linear programming #
 #############################
 
-def load_stigler_data(verbose=False):
+
+
+def load_stigler_data(nbi = 9, nbj = 77, verbose=False):
     import pandas as pd
     thepath = 'https://raw.githubusercontent.com/math-econ-code/mec_optim_2021-01/master/data_mec_optim/lp_stigler-diet/'
     filename = 'StiglerData1939.txt'
@@ -21,18 +23,20 @@ def load_stigler_data(verbose=False):
     thedata = thedata.dropna(how = 'all')
     commodities = (thedata['Commodity'].values)[:-1]
     allowance = thedata.iloc[-1, 4:].fillna(0).transpose()
+    nbi = min(len(allowance),nbi)
+    nbj = min(len(commodities),nbj)
     if verbose:
         print('Daily nutrient content:')
         print(tabulate(thedata.head()))
         print('\nDaily nutrient requirement:')
         print(allowance)
-    return({'N_i_j':thedata.iloc[:-1, 4:].fillna(0).transpose().values,
-            'd_i':np.array(allowance),
-            'c_j':np.ones(len(commodities)),
-            'nbi':len(allowance),
-            'nbj':len(commodities),
-            'names_i': list(thedata.columns)[4:],
-            'names_j':commodities}) 
+    return({'N_i_j':thedata.iloc[:nbj, 4:(4+nbi)].fillna(0).to_numpy().T,
+            'd_i':np.array(allowance)[0:nbi],
+            'c_j':np.ones(len(commodities))[0:nbj],
+            'nbi':nbi,
+            'nbj':nbj,
+            'names_i': list(thedata.columns)[4:(4+nbi)],
+            'names_j':commodities[0:nbj]}) 
 
 
 def print_optimal_diet(q_j):
