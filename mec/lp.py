@@ -107,6 +107,16 @@ class LP():
 def round_expr(expr, num_digits):
     return expr.xreplace({n : round(n, num_digits) for n in expr.atoms(Number)})
 
+def limited_tabulate(data, headers=None, tablefmt='grid', max_rows=18, max_cols=14):
+    if max_rows is not None and len(data) > max_rows:
+        data = data[:max_rows]
+
+    if max_cols is not None:
+        if headers:
+            headers = headers[:max_cols]
+        data = [row[:max_cols] for row in data]
+    
+    return tabulate(data, headers=headers, tablefmt=tablefmt)
 
 class Dictionary():
     def __init__(self, names_basic, names_nonbasic, A_i_j, d_i, c_j): # s = d - A @ x
