@@ -47,22 +47,22 @@ def print_optimal_diet(q_j):
     thelist.append(['Total cost (optimal):', total])
     print(tabulate(thelist))
 
+
 class LP():
-    def __init__(self,A_i_j,d_i,c_j,var_names_j=None,slack_names_i=None):
+    def __init__(self,A_i_j,d_i,c_j,decision_var_names_j=None,slack_var_names_i=None):
         self.A_i_j = A_i_j
         self.nbi , self.nbj = A_i_j.shape
         self.nbk = self.nbi+self.nbj
         self.d_i = d_i
         self.c_j = c_j
-        if var_names_j is None:
-            var_names_j = ['x_'+str(j) for j in range(self.nbj)]
-        if slack_names_i is None:
-            slack_names_i = ['s_'+str(i) for i in range(self.nbi)]
-        self.var_names_j = var_names_j
-        self.slack_names_i = slack_names_i
+        if decision_var_names_j is None:
+            decision_var_names_j = ['x_'+str(j) for j in range(self.nbj)]
+        if slack_var_names_i is None:
+            slack_var_names_i = ['s_'+str(i) for i in range(self.nbi)]
+        self.decision_var_names_j = decision_var_names_j
+        self.slack_var_names_i = slack_var_names_i
         
     def gurobi_solve(self,verbose=0):
-        import gurobipy as grb
         m = grb.Model()
         if verbose == 0:
             m.setParam('OutputFlag', 0)
@@ -87,19 +87,18 @@ class LP():
         plt.contourf(x1, x2, np.where(feasible_region, self.c_j[0]*x1 + self.c_j[1]*x2, np.nan), 50, alpha = 0.5, cmap='gray_r', levels=30)
         for i, di in enumerate(self.d_i):
             if self.A_i_j[i,1] != 0:
-                ax.plot(x1[0, :], di/self.A_i_j[i,1] - self.A_i_j[i,0]/self.A_i_j[i,1]*x1[0, :], label=self.slack_names_i[i]+' = 0')
+                ax.plot(x1[0, :], di/self.A_i_j[i,1] - self.A_i_j[i,0]/self.A_i_j[i,1]*x1[0, :], label=self.slack_var_names_i[i]+' = 0')
             else:
-                ax.axvline(di/self.A_i_j[i,0], label=self.slack_names_i[i]+' = 0')
+                ax.axvline(di/self.A_i_j[i,0], label=self.slack_var_names_i[i]+' = 0')
         if the_path:
             ax.plot([a for (a,_) in the_path], [b for (_,b) in the_path], 'r--', label='Agorithm path')
             ax.scatter([a for (a,_) in the_path], [b for (_,b) in the_path], color='red')
         ax.set_xlim(-.2*x1max, 1.4*x1max), ax.set_ylim(-.2*x2max, 1.4*x2max)
-        ax.set_xlabel(self.var_names_j[0]), ax.set_ylabel(self.var_names_j[1])
+        ax.set_xlabel(self.decision_var_names_j[0]), ax.set_ylabel(self.decision_var_names_j[1])
         ax.spines[ 'left' ].set_position('zero'), ax.spines['bottom'].set_position('zero')
         ax.spines['right'].set_color('none'), ax.spines['top'].set_color('none')
         if legend: ax.legend(loc='upper right')
         plt.show()
-
 
 #########################
 # LP2: The simplex algorithm #
