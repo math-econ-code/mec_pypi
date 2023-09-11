@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import scipy.sparse as spr
-#import gurobipy as grb
+import gurobipy as grb
 import sympy
 from sympy.solvers import solve
 from sympy import *
