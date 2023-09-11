@@ -62,6 +62,7 @@ class LP():
         self.slack_names_i = slack_names_i
         
     def gurobi_solve(self,verbose=0):
+        import gurobipy as grb
         m = grb.Model()
         if verbose == 0:
             m.setParam('OutputFlag', 0)
@@ -145,33 +146,33 @@ class Dictionary():
             if verbose > 1: print(var, '=', solution[var])
         return solution
 
-    def plot_path (self, the_path, legend=True):
-        nbi,nbj = self.A_i_j.shape
-        if len(self.c_j[self.c_j!=0]) > 2:
-            print('Can\'t plot the solution in 2D: the vector self.c_j needs to have at most 2 nonzero entries.')
-            return()
-        x1max = min(di/self.A_i_j[i,0] for i, di in enumerate(self.d_i) if self.A_i_j[i,0] != 0 and di/self.A_i_j[i,0] >= 0)
-        x2max = min(di/self.A_i_j[i,1] for i, di in enumerate(self.d_i) if self.A_i_j[i,1] != 0 and di/self.A_i_j[i,1] >= 0)
-        x1, x2 = np.meshgrid(np.linspace(-.2*x1max, 1.4*x1max, 400), np.linspace(-.2*x2max, 1.4*x2max, 400))
-        feasible_region = (x1 >= 0) & (x2 >= 0)
-        for i, di in enumerate(self.d_i):
-            feasible_region = feasible_region & (self.A_i_j[i,0] * x1 + self.A_i_j[i,1] * x2 <= di)
-        fig, ax = plt.subplots(figsize=(5, 5))
-        plt.contourf(x1, x2, np.where(feasible_region, self.c_j[0]*x1 + self.c_j[1]*x2, np.nan), 50, alpha = 0.5, cmap='gray_r', levels=30)
-        for i, di in enumerate(self.d_i):
-            if self.A_i_j[i,1] != 0:
-                ax.plot(x1[0, :], di/self.A_i_j[i,1] - self.A_i_j[i,0]/self.A_i_j[i,1]*x1[0, :], label=self.init_names_basic[i]+' = 0')
-            else:
-                ax.axvline(di/self.A_i_j[i,0], label=self.init_names_basic[i]+' = 0')
-        if the_path:
-            ax.plot([a for (a,_) in the_path], [b for (_,b) in the_path], 'r--', label='Agorithm path')
-            ax.scatter([a for (a,_) in the_path], [b for (_,b) in the_path], color='red')
-        ax.set_xlim(-.2*x1max, 1.4*x1max), ax.set_ylim(-.2*x2max, 1.4*x2max)
-        ax.set_xlabel(self.init_names_nonbasic[0]), ax.set_ylabel(self.init_names_nonbasic[1])
-        ax.spines[ 'left' ].set_position('zero'), ax.spines['bottom'].set_position('zero')
-        ax.spines['right'].set_color('none'), ax.spines['top'].set_color('none')
-        if legend: ax.legend(loc='upper right')
-        plt.show()
+    # def plot_path (self, the_path, legend=True):
+        # nbi,nbj = self.A_i_j.shape
+        # if len(self.c_j[self.c_j!=0]) > 2:
+            # print('Can\'t plot the solution in 2D: the vector self.c_j needs to have at most 2 nonzero entries.')
+            # return()
+        # x1max = min(di/self.A_i_j[i,0] for i, di in enumerate(self.d_i) if self.A_i_j[i,0] != 0 and di/self.A_i_j[i,0] >= 0)
+        # x2max = min(di/self.A_i_j[i,1] for i, di in enumerate(self.d_i) if self.A_i_j[i,1] != 0 and di/self.A_i_j[i,1] >= 0)
+        # x1, x2 = np.meshgrid(np.linspace(-.2*x1max, 1.4*x1max, 400), np.linspace(-.2*x2max, 1.4*x2max, 400))
+        # feasible_region = (x1 >= 0) & (x2 >= 0)
+        # for i, di in enumerate(self.d_i):
+            # feasible_region = feasible_region & (self.A_i_j[i,0] * x1 + self.A_i_j[i,1] * x2 <= di)
+        # fig, ax = plt.subplots(figsize=(5, 5))
+        # plt.contourf(x1, x2, np.where(feasible_region, self.c_j[0]*x1 + self.c_j[1]*x2, np.nan), 50, alpha = 0.5, cmap='gray_r', levels=30)
+        # for i, di in enumerate(self.d_i):
+            # if self.A_i_j[i,1] != 0:
+                # ax.plot(x1[0, :], di/self.A_i_j[i,1] - self.A_i_j[i,0]/self.A_i_j[i,1]*x1[0, :], label=self.init_names_basic[i]+' = 0')
+            # else:
+                # ax.axvline(di/self.A_i_j[i,0], label=self.init_names_basic[i]+' = 0')
+        # if the_path:
+            # ax.plot([a for (a,_) in the_path], [b for (_,b) in the_path], 'r--', label='Agorithm path')
+            # ax.scatter([a for (a,_) in the_path], [b for (_,b) in the_path], color='red')
+        # ax.set_xlim(-.2*x1max, 1.4*x1max), ax.set_ylim(-.2*x2max, 1.4*x2max)
+        # ax.set_xlabel(self.init_names_nonbasic[0]), ax.set_ylabel(self.init_names_nonbasic[1])
+        # ax.spines[ 'left' ].set_position('zero'), ax.spines['bottom'].set_position('zero')
+        # ax.spines['right'].set_color('none'), ax.spines['top'].set_color('none')
+        # if legend: ax.legend(loc='upper right')
+        # plt.show()
     
 
 
