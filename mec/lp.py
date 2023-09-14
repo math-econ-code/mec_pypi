@@ -7,6 +7,7 @@ from sympy.solvers import solve
 from sympy import *
 import matplotlib.pyplot as plt
 from tabulate import tabulate
+import pkg_resources
 
 
 #############################
@@ -17,10 +18,9 @@ from tabulate import tabulate
 
 def load_stigler_data(nbi = 9, nbj = 77, verbose=False):
     import pandas as pd
-    #thepath = 'https://raw.githubusercontent.com/math-econ-code/mec_optim_2021-01/master/data_mec_optim/lp_stigler-diet/'
-    thepath = 'datasets/'
-    filename = 'StiglerData1939.txt'
-    thedata = pd.read_csv(thepath + filename, sep='\t')
+    #thepath = 'https://raw.githubusercontent.com/math-econ-code/mec_optim_2021-01/master/data_mec_optim/lp_stigler-diet/StiglerData1939.txt'
+    thepath =data_file_path = pkg_resources.resource_filename('mec', 'datasets/StiglerData1939.txt')
+    thedata = pd.read_csv(thepath , sep='\t')
     thedata = thedata.dropna(how = 'all')
     commodities = (thedata['Commodity'].values)[:-1]
     allowance = thedata.iloc[-1, 4:].fillna(0).transpose()
