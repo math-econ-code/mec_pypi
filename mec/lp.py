@@ -17,7 +17,8 @@ from tabulate import tabulate
 
 def load_stigler_data(nbi = 9, nbj = 77, verbose=False):
     import pandas as pd
-    thepath = 'https://raw.githubusercontent.com/math-econ-code/mec_optim_2021-01/master/data_mec_optim/lp_stigler-diet/'
+    #thepath = 'https://raw.githubusercontent.com/math-econ-code/mec_optim_2021-01/master/data_mec_optim/lp_stigler-diet/'
+    thepath = 'datasets/'
     filename = 'StiglerData1939.txt'
     thedata = pd.read_csv(thepath + filename, sep='\t')
     thedata = thedata.dropna(how = 'all')
@@ -118,14 +119,13 @@ def limited_tabulate(data, headers=None, tablefmt='grid', max_rows=18, max_cols=
     
     return tabulate(data, headers=headers, tablefmt=tablefmt)
 
-class Dictionary():
-    def __init__(self, names_basic, names_nonbasic, A_i_j, d_i, c_j): # s = d - A @ x
-        self.A_i_j, self.d_i, self.c_j = A_i_j, d_i, c_j
-        self.init_names_basic = names_basic
-        self.init_names_nonbasic = names_nonbasic
-        self.nonbasic = list(symbols(names_nonbasic))
+class Dictionary(LP):
+    def __init__(self, A_i_j, d_i, c_j , slack_var_names_i=None,decision_var_names_j=None): # s_i = d_i - A_i_j @ x_j
+        LP.__init__(self,A_i_j, d_i, c_j,decision_var_names_j,slack_var_names_i)
+        self.nonbasic = symbols(self.decision_var_names_j)
         self.base = { Symbol('obj') : c_j @ self.nonbasic }
-        self.base.update( { list(symbols(names_basic))[i]: d_i[i]  - (A_i_j @ self.nonbasic)[i] for i in range(len(d_i))} )
+        slack_exprs_i = d_i  - A_i_j @ self.nonbasic
+        self.base.update({Symbol(name): slack_exprs_i[i] for (i,name) in enumerate(self.slack_var_names_i) })
 
     def variables(self):
         return( list(self.base.keys())[1:] + self.nonbasic)
@@ -135,46 +135,15 @@ class Dictionary():
         for var in self.base:
             print(var, '=', round_expr(self.base[var],2))
             
-    def solution(self, verbose=0):
-        solution = {}
-        for var in self.base:
-            solution[var] = float(self.base[var].subs([(variable,0) for variable in self.nonbasic]))
-            if verbose > 0: print(var, '=', solution[var])
-        for var in self.nonbasic:
-            solution[var] = 0.0
-            if verbose > 1: print(var, '=', solution[var])
-        return solution
-
-    # def plot_path (self, the_path, legend=True):
-        # nbi,nbj = self.A_i_j.shape
-        # if len(self.c_j[self.c_j!=0]) > 2:
-            # print('Can\'t plot the solution in 2D: the vector self.c_j needs to have at most 2 nonzero entries.')
-            # return()
-        # x1max = min(di/self.A_i_j[i,0] for i, di in enumerate(self.d_i) if self.A_i_j[i,0] != 0 and di/self.A_i_j[i,0] >= 0)
-        # x2max = min(di/self.A_i_j[i,1] for i, di in enumerate(self.d_i) if self.A_i_j[i,1] != 0 and di/self.A_i_j[i,1] >= 0)
-        # x1, x2 = np.meshgrid(np.linspace(-.2*x1max, 1.4*x1max, 400), np.linspace(-.2*x2max, 1.4*x2max, 400))
-        # feasible_region = (x1 >= 0) & (x2 >= 0)
-        # for i, di in enumerate(self.d_i):
-            # feasible_region = feasible_region & (self.A_i_j[i,0] * x1 + self.A_i_j[i,1] * x2 <= di)
-        # fig, ax = plt.subplots(figsize=(5, 5))
-        # plt.contourf(x1, x2, np.where(feasible_region, self.c_j[0]*x1 + self.c_j[1]*x2, np.nan), 50, alpha = 0.5, cmap='gray_r', levels=30)
-        # for i, di in enumerate(self.d_i):
-            # if self.A_i_j[i,1] != 0:
-                # ax.plot(x1[0, :], di/self.A_i_j[i,1] - self.A_i_j[i,0]/self.A_i_j[i,1]*x1[0, :], label=self.init_names_basic[i]+' = 0')
-            # else:
-                # ax.axvline(di/self.A_i_j[i,0], label=self.init_names_basic[i]+' = 0')
-        # if the_path:
-            # ax.plot([a for (a,_) in the_path], [b for (_,b) in the_path], 'r--', label='Agorithm path')
-            # ax.scatter([a for (a,_) in the_path], [b for (_,b) in the_path], color='red')
-        # ax.set_xlim(-.2*x1max, 1.4*x1max), ax.set_ylim(-.2*x2max, 1.4*x2max)
-        # ax.set_xlabel(self.init_names_nonbasic[0]), ax.set_ylabel(self.init_names_nonbasic[1])
-        # ax.spines[ 'left' ].set_position('zero'), ax.spines['bottom'].set_position('zero')
-        # ax.spines['right'].set_color('none'), ax.spines['top'].set_color('none')
-        # if legend: ax.legend(loc='upper right')
-        # plt.show()
+            
+    def primal_solution(self, verbose=0):
+        x_j = np.zeros(self.nbj)
+        for j,var in enumerate(symbols(self.decision_var_names_j)):
+            x_j[j]=float( self.base.get(var,sympy.Integer(0)).subs([(variable,0) for variable in self.nonbasic]) )
+            if verbose > 0:
+                print(var, '=', x_j[j])
+        return x_j
     
-
-
     def determine_entering(self):
         self.nonbasic.sort(key=str) # Bland's rule
         for entering_var in self.nonbasic:
@@ -183,16 +152,16 @@ class Dictionary():
         return None # If no entering variable found, None returned
     
     def determine_departing(self,entering_var):
-      runmin = float('inf')
-      departing_var = None
-      for var in self.base.keys() - {Symbol('obj')}:
+        runmin = float('inf')
+        departing_var = None
+        for var in self.base.keys() - {Symbol('obj')}:
             the_expr_list = solve(self.base[var] - var,entering_var)
             if the_expr_list: # if one can invert the previous expression
                 the_expr = the_expr_list[0] # express entering variable as a function of the other ones:
                 val_entering_var = the_expr.subs([ (variable,0) for variable in [var]+self.nonbasic])
                 if (val_entering_var >= 0) & (val_entering_var < runmin) :
-                  runmin,departing_var = val_entering_var, var
-      return departing_var # if no variable is found, None returned
+                    runmin,departing_var = val_entering_var, var
+        return departing_var # if no variable is found, None returned
         
     def pivot(self,entering_var,departing_var, verbose = 0):
         expr_entering = solve(self.base[departing_var] - departing_var,entering_var)[0]
@@ -207,21 +176,125 @@ class Dictionary():
         if verbose > 1:
             print(str( entering_var)+' = '+str(round_expr(expr_entering,2)))
         return expr_entering
-
-    def loop(self):
+        
+    def step(self,verbose=0):
         entering_var = self.determine_entering()
         if entering_var is None:
             print('Optimal solution found.\n=======================')
-            self.solution(verbose=2)
+            self.primal_solution(verbose)
         else:
             departing_var = self.determine_departing(entering_var)
             if departing_var is None:
                 print('Unbounded solution.')
             else:
-                expr_entering_var = self.pivot(entering_var,departing_var, verbose=1)
+                expr_entering_var = self.pivot(entering_var,departing_var, verbose)
                 return False # not finished
         return True # finished
+        
+    def dual_solution(self,verbose = 0):
+        y_i = np.zeros(self.nbi)
+        for i,slackvar in enumerate(self.slack_var_names_i):
+            y_i[i] = - diff(self.base[Symbol('obj')],slackvar)
+            if verbose > 0 and y_i[i] != 0:
+                print('pi_'+str(i)+'=', y_i[i])
+        return y_i
+        
+        
+    def simplex_loop(self,verbose = 0):
+        if verbose >2:
+            [x1,x2] = symbols(self.decision_var_names_j)
+            the_path = [self.primal_solution()]
+        finished = False
+        while not finished:
+            finished = self.step()
+            if verbose>2:
+                the_path.append(self.primal_solution())
+        objVal = self.base[Symbol('obj')].subs([ (variable,0) for variable in self.nonbasic])
+        if verbose>0:
+            print('\nValue = ' + str(objVal))
+        if verbose >2:
+            self.plot2d(the_path, legend=False)
+        return (self.primal_solution(),self.dual_solution(),objVal)
+        
+        
+        
+        
+class Tableau(LP):
+    def __init__(self, A_i_j, d_i, c_j,slack_var_names_i=None, decision_var_names_j = None): # s_i = d_i - (A_i_j @ x_j
+        LP.__init__(self,A_i_j, d_i, c_j,decision_var_names_j,slack_var_names_i)
+        self.nbi,self.nbj = A_i_j.shape
+        self.nbk = self.nbi+self.nbj
+        self.names_all_variables =  self.slack_var_names_i + self.decision_var_names_j
+        self.tableau = np.block([[np.zeros((1,self.nbi)), c_j.reshape((1,-1)), 0],[np.eye(self.nbi),A_i_j,d_i.reshape((-1,1))]])
+        self.k_b = list(range(self.nbi)) # columns associated with basic variables
+        self.i_b = list(range(1,1+self.nbi)) # rows associated with basic variables
 
+    def display(self):
+        tableau = []
+        tableau.append(['Obj'] + list(self.tableau[0,:])  )
+        for b in range(self.nbi):
+             tableau.append([self.names_all_variables[self.k_b[b]]]+list(self.tableau[self.i_b[b],:]) )
+        
+        print(limited_tabulate(tableau, headers=[''] + self.names_all_variables + ['RHS'], tablefmt="grid"))
+        
+
+    def determine_entering(self):
+        for k in range(self.nbk):
+            if self.tableau[0,k] > 0:
+                return k
+        return None # If no entering variable found, None returned
+
+    def determine_departing(self,kent):
+        thedic = {b: self.tableau[self.i_b[b],-1] / self.tableau[self.i_b[b],kent] 
+                  for b in range(self.nbi) if self.tableau[self.i_b[b],kent]>0}
+        bdep = min(thedic, key = thedic.get)
+        return bdep
+
+    def update(self,kent,bdep):
+        idep = self.i_b[bdep]
+        self.tableau[idep,:] = self.tableau[idep,:] / self.tableau[idep,kent] 
+        for i in range(1+self.nbi):
+            if i != idep:
+                self.tableau[i,:]= self.tableau[i,:] - self.tableau[idep,:] * self.tableau[i,kent] 
+                
+        self.k_b[bdep] = kent
+        self.i_b[bdep] = idep
+        
+    def simplex_step(self,verbose=0):
+        if verbose>1:
+            self.display()
+        kent = self.determine_entering()
+        if kent is not None:
+            bdep= self.determine_departing(kent)
+            name_entering = self.names_all_variables[kent]
+            name_departing = self.names_all_variables[self.i_b[bdep]]
+            if verbose>0:
+                print('Entering=', name_entering, 'Departing=',name_departing,'Pivot=',(self.i_b[bdep],kent))
+            self.update(kent,bdep)
+        else:
+            if verbose>0:
+                print ('Optimal solution found.')
+            if verbose>1:
+                self.display()
+        return (kent is not None) # returns false  if optimal solution; true otherwise
+
+    def simplex_solve(self,verbose=0):
+        while self.simplex_step(verbose):
+            pass
+        return self.solution()
+        
+
+    def solution(self):
+        x_j = np.zeros(self.nbj)
+        s_i = np.zeros(self.nbi)
+        for b in range(self.nbi):
+            if self.k_b[b]<self.nbi:
+                s_i[self.k_b[b]] = self.tableau[self.i_b[b],-1]
+            else:
+                x_j[self.k_b[b]-self.nbi] = self.tableau[self.i_b[b],-1]
+        y_i = - self.tableau[0,:self.nbi] 
+        return(x_j,y_i,x_j@self.c_j)
+    
 
 #########################
 # LP3: Interior Point Methods #
