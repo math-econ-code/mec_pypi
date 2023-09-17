@@ -50,7 +50,7 @@ def print_optimal_diet(q_j):
 
 
 class LP():
-    def __init__(self,A_i_j,d_i,c_j,decision_var_names_j=None,slack_var_names_i=None):
+    def __init__(self,A_i_j,d_i,c_j,decision_var_names_j = None,slack_var_names_i = None):
         self.A_i_j = A_i_j
         self.nbi , self.nbj = A_i_j.shape
         self.nbk = self.nbi+self.nbj
@@ -120,7 +120,9 @@ def limited_tabulate(data, headers=None, tablefmt='grid', max_rows=18, max_cols=
     return tabulate(data, headers=headers, tablefmt=tablefmt)
 
 class Dictionary(LP):
-    def __init__(self, A_i_j, d_i, c_j , slack_var_names_i=None,decision_var_names_j=None): # s_i = d_i - A_i_j @ x_j
+    def __init__(self, A_i_j, d_i, c_j = None , slack_var_names_i=None,decision_var_names_j=None): # s_i = d_i - A_i_j @ x_j
+        if c_j is None:
+            c_j = np.zeros(A_i_j.shape[1])
         LP.__init__(self,A_i_j, d_i, c_j,decision_var_names_j,slack_var_names_i)
         self.nonbasic = symbols(self.decision_var_names_j)
         self.base = { Symbol('obj') : c_j @ self.nonbasic }
