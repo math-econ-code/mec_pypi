@@ -1,6 +1,8 @@
 import gurobipy as grb
 import numpy as np
 from mec.lp import Dictionary
+from mec.lp import Tableau
+
 
 
 class Matrix_game:
@@ -93,3 +95,103 @@ class Bimatrix_game:
         q_j = y_j * val1
         sol_dict = {'val1':val1, 'val2':val2, 'p_i':p_i,'q_j':q_j}
         return(sol_dict)
+
+
+
+
+
+class ScarfDoublePivot:
+    def __init__(self,C_i_c,A_i_c,d_i,c_missing = 0, M=1e5):
+        self.nbi,self.nbc = C_i_c.shape
+        self.C_i_c = C_i_c
+        self.A_i_c = A_i_c
+        self.d_i = d_i
+        self.M = M
+        ###
+
+    def is_standard_form(self):
+        cond_1 = (np.diag(self.C_i_c)  == self.C_i_c.min(axis = 1) ).all() 
+        cond_2 = ((self.C_i_c[:,:self.nbi] + np.diag([np.inf] * self.nbi)).min(axis=1) >= self.C_i_c[:,self.nbi:].max(axis=1)).all()
+        return (cond_1 & cond_2)
+    
+    def remove_degeneracies(self, eps = 1e-5):
+        self.d_i = self.d_i + np.arange(1,self.nbi+1)*eps
+        
+    def u_i(self,basis):
+        return self.C_i_c[:,basis].min(axis = 1)
+    
+    def xsol_c(self,basis=None):
+        if basis is None:
+            basis = self.basis_C
+        B = self.A_i_c[:,basis]
+        x_c = np.zeros(self.nbc)
+        x_c[basis] = np.linalg.solve(B,self.d_i)
+        return x_c
+    
+    def is_feasible_basis(self,basis):    
+        try:
+            if self.xsol_c(basis).min()>=0:
+                return True
+        except np.linalg.LinAlgError:
+            pass
+        return False
+        
+    def is_ordinal_basis(self,basis):
+        res=False
+        if len(set(basis))==self.nbi:
+            res = (self.u_i(basis)[:,None] >= self.C_i_c).any(axis = 0).all()
+        return res
+
+       
+    def init_algo(self,c_missing):
+        self.nbstep = 0
+        self.tableau_A = Tableau( self.A_i_c[:,self.nbi:self.nbc], d_i = self.d_i, c_j = np.zeros(self.nbc-self.nbi), 
+                        slack_var_names_i = [str(i) for i in range(self.nbi)],
+                        decision_var_names_j =[str(i) for i in range(self.nbi,self.nbc)] )
+        self.basis_C = list(range(self.nbi))
+        self.basis_C.remove(c_missing)
+        entvar = self.nbi+self.C_i_c[c_missing,self.nbi:].argmax()
+        self.basis_C.append(entvar)
+        self.entvar = entvar
+        return 
+    
+        
+    def continue_C(self,departing):
+        ubefore_i = self.u_i(self.basis_C)
+        self.basis_C.remove(departing)
+        uafter_i = self.u_i(self.basis_C)
+        i0 = np.where(ubefore_i < uafter_i)[0][0]
+        c0 = min([(c,self.C_i_c[i0,c]) for c in self.basis_C  ],key = lambda x: x[1])[0]
+        istar = [i for i in range(self.nbi) if uafter_i[i] == self.C_i_c[i,c0] and i != i0][0]
+        eligible_columns = [c for c in range(self.nbc) if min( [self.C_i_c[i,c] - uafter_i[i] for i in range(self.nbi) if i != istar]) >0 ]
+        cstar = max([(c,self.C_i_c[istar,c]) for c in eligible_columns], key = lambda x: x[1])[0]
+        return cstar
+        
+    
+    def step(self,verbose= 0):
+        self.nbstep += 1
+        basis_A =  self.tableau_A.k_b.copy() 
+        depvar = self.tableau_A.determine_departing(self.entvar)
+        depcol = self.tableau_A.k_b[depvar]
+        self.tableau_A.update(self.entvar,depvar)
+        if set(self.basis_C) == set(self.tableau_A.k_b):
+            if verbose>0:
+                print('Step=', self.nbstep)
+                print('Solution found. Basis=',set([a+1 for a in self.basis_C]) )
+            return True
+        ####
+        u_i = self.u_i(self.basis_C)
+        c0 = self.continue_C(depcol)
+        ### 
+        if verbose>0:
+            print('Step=', self.nbstep)
+            print('A basis = ' ,set([a+1 for a in basis_A]))
+            print('C basis = ' ,set([c+1 for c in self.basis_C]+[depcol+1]))
+            print('u_i=',u_i )
+            print('entering var (A)=',self.entvar+1)
+            print('departing var (A and C)=',depcol+1)
+            print('entering var (C)=',c0+1)
+        self.basis_C.append(c0)
+
+        self.entvar = c0
+        return False
