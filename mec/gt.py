@@ -101,36 +101,38 @@ class Bimatrix_game:
 
 
 class ScarfDoublePivot:
-    def __init__(self,C_i_c,A_i_c,d_i,c_missing = 0, M=1e5):
-        self.nbi,self.nbc = C_i_c.shape
-        self.C_i_c = C_i_c
-        self.A_i_c = A_i_c
-        self.d_i = d_i
-        self.M = M
+    def __init__(self,C_i_j,A_i_j,d_i = None):
+        self.nbi,self.nbj = C_i_j.shape
+        self.C_i_j = C_i_j
+        self.A_i_j = A_i_j
+        if d_i is  None:
+            self.d_i = np.ones(self.nbi)
+        else:
+            self.d_i = d_i
         ###
 
     def is_standard_form(self):
-        cond_1 = (np.diag(self.C_i_c)  == self.C_i_c.min(axis = 1) ).all() 
-        cond_2 = ((self.C_i_c[:,:self.nbi] + np.diag([np.inf] * self.nbi)).min(axis=1) >= self.C_i_c[:,self.nbi:].max(axis=1)).all()
+        cond_1 = (np.diag(self.C_i_j)  == self.C_i_j.min(axis = 1) ).all() 
+        cond_2 = ((self.C_i_j[:,:self.nbi] + np.diag([np.inf] * self.nbi)).min(axis=1) >= self.C_i_j[:,self.nbi:].max(axis=1)).all()
         return (cond_1 & cond_2)
     
     def remove_degeneracies(self, eps = 1e-5):
         self.d_i = self.d_i + np.arange(1,self.nbi+1)*eps
         
     def u_i(self,basis):
-        return self.C_i_c[:,basis].min(axis = 1)
+        return self.C_i_j[:,basis].min(axis = 1)
     
-    def xsol_c(self,basis=None):
+    def xsol_j(self,basis=None):
         if basis is None:
             basis = self.basis_C
-        B = self.A_i_c[:,basis]
-        x_c = np.zeros(self.nbc)
-        x_c[basis] = np.linalg.solve(B,self.d_i)
-        return x_c
+        B = self.A_i_j[:,basis]
+        x_j = np.zeros(self.nbj)
+        x_j[basis] = np.linalg.solve(B,self.d_i)
+        return x_j
     
     def is_feasible_basis(self,basis):    
         try:
-            if self.xsol_c(basis).min()>=0:
+            if self.xsol_j(basis).min()>=0:
                 return True
         except np.linalg.LinAlgError:
             pass
@@ -139,18 +141,18 @@ class ScarfDoublePivot:
     def is_ordinal_basis(self,basis):
         res=False
         if len(set(basis))==self.nbi:
-            res = (self.u_i(basis)[:,None] >= self.C_i_c).any(axis = 0).all()
+            res = (self.u_i(basis)[:,None] >= self.C_i_j).any(axis = 0).all()
         return res
 
        
-    def init_algo(self,c_missing):
+    def init_algo(self,j_removed):
         self.nbstep = 0
-        self.tableau_A = Tableau( self.A_i_c[:,self.nbi:self.nbc], d_i = self.d_i, c_j = np.zeros(self.nbc-self.nbi), 
+        self.tableau_A = Tableau( self.A_i_j[:,self.nbi:self.nbj], d_i = self.d_i, c_j = np.zeros(self.nbj-self.nbi), 
                         slack_var_names_i = [str(i) for i in range(self.nbi)],
-                        decision_var_names_j =[str(i) for i in range(self.nbi,self.nbc)] )
+                        decision_var_names_j =[str(i) for i in range(self.nbi,self.nbj)] )
         self.basis_C = list(range(self.nbi))
-        self.basis_C.remove(c_missing)
-        entvar = self.nbi+self.C_i_c[c_missing,self.nbi:].argmax()
+        self.basis_C.remove(j_removed)
+        entvar = self.nbi+self.C_i_j[j_removed,self.nbi:].argmax()
         self.basis_C.append(entvar)
         self.entvar = entvar
         return 
@@ -161,10 +163,10 @@ class ScarfDoublePivot:
         self.basis_C.remove(departing)
         uafter_i = self.u_i(self.basis_C)
         i0 = np.where(ubefore_i < uafter_i)[0][0]
-        c0 = min([(c,self.C_i_c[i0,c]) for c in self.basis_C  ],key = lambda x: x[1])[0]
-        istar = [i for i in range(self.nbi) if uafter_i[i] == self.C_i_c[i,c0] and i != i0][0]
-        eligible_columns = [c for c in range(self.nbc) if min( [self.C_i_c[i,c] - uafter_i[i] for i in range(self.nbi) if i != istar]) >0 ]
-        cstar = max([(c,self.C_i_c[istar,c]) for c in eligible_columns], key = lambda x: x[1])[0]
+        c0 = min([(c,self.C_i_j[i0,c]) for c in self.basis_C  ],key = lambda x: x[1])[0]
+        istar = [i for i in range(self.nbi) if uafter_i[i] == self.C_i_j[i,c0] and i != i0][0]
+        eligible_columns = [c for c in range(self.nbj) if min( [self.C_i_j[i,c] - uafter_i[i] for i in range(self.nbi) if i != istar]) >0 ]
+        cstar = max([(c,self.C_i_j[istar,c]) for c in eligible_columns], key = lambda x: x[1])[0]
         return cstar
         
     

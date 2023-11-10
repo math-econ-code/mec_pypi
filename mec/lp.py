@@ -222,9 +222,11 @@ class Dictionary(LP):
         
         
 class Tableau(LP):
-    def __init__(self, A_i_j, d_i, c_j,slack_var_names_i=None, decision_var_names_j = None): # s_i = d_i - (A_i_j @ x_j
+    def __init__(self, A_i_j, d_i, c_j = None,slack_var_names_i=None, decision_var_names_j = None): # s_i = d_i - (A_i_j @ x_j
         LP.__init__(self,A_i_j, d_i, c_j,decision_var_names_j,slack_var_names_i)
         self.nbi,self.nbj = A_i_j.shape
+        if c_j is None:
+            c_j = np.zeros(self.nbj)
         self.nbk = self.nbi+self.nbj
         self.names_all_variables =  self.slack_var_names_i + self.decision_var_names_j
         self.tableau = np.block([[np.zeros((1,self.nbi)), c_j.reshape((1,-1)), 0],[np.eye(self.nbi),A_i_j,d_i.reshape((-1,1))]])
