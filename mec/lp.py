@@ -6,7 +6,7 @@ import sympy
 from sympy.solvers import solve
 from sympy import *
 import matplotlib.pyplot as plt
-from tabulate import tabulate
+import tabulate as tb
 
 
 
@@ -26,7 +26,7 @@ def print_optimal_diet(q_j):
             total += q_j[j] * 365
             thelist.append([commodity,q_j[j]])
     thelist.append(['Total cost (optimal):', total])
-    print(tabulate(thelist))
+    print(tb.tabulate(thelist))
 
 
 class LP():
@@ -97,7 +97,7 @@ def limited_tabulate(data, headers=None, tablefmt='grid', max_rows=18, max_cols=
             headers = headers[:max_cols]
         data = [row[:max_cols] for row in data]
     
-    return tabulate(data, headers=headers, tablefmt=tablefmt)
+    return tb.tabulate(data, headers=headers, tablefmt=tablefmt)
 
 class Dictionary(LP):
     def __init__(self, A_i_j, d_i, c_j = None , slack_var_names_i=None,decision_var_names_j=None): # s_i = d_i - A_i_j @ x_j
