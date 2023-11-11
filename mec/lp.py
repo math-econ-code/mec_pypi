@@ -231,7 +231,7 @@ class Tableau(LP):
             self.display()
         kent = self.determine_entering()
         if kent is not None:
-            kdep= self.determine_departing(kent)
+            kdep= self.determine_departing2(kent)
             if verbose>0:
                 bdep = int(np.where(self.k_b == kdep)[0])  
                 print('Entering=', self.names_all_variables[kent], 'Departing=',self.names_all_variables[self.i_b[bdep]],'Pivot=',(self.i_b[bdep],kent))
