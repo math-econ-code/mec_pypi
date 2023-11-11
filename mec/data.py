@@ -29,6 +29,8 @@ def load_DupuyGalichon_data( verbose=False):
     data_X = pd.read_csv(thepath + "Xvals.csv")
     data_Y = pd.read_csv(thepath + "Yvals.csv")
     aff_data = pd.read_csv(thepath + "affinitymatrix.csv")
+    nbx,nbk = data_X.shape
+    nby,nbl = data_Y.shape
     A_k_l = aff_data.iloc[0:nbk,1:nbl+1].values
 
     if verbose:
