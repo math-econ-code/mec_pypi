@@ -230,21 +230,21 @@ class TUlogit: # added on D5
 
     def isCoercive(self):
         def poisson_coerciveness(X,y):
-        n,m = X.shape
-        b = X.T @ y
-        m=grb.Model()
-        u = m.addMVar(shape = 1)
-        mu = m.addMVar(shape=n)
-        m.setObjective(1 * u, grb.GRB.MAXIMIZE)
-        m.addConstr(X.T @ mu == b)
-        m.addConstr( mu - np.ones((n,1)) @ u >= 0)
-        m.optimize()
-        if m.status == grb.GRB.Status.OPTIMAL:
-            solution = np.array(m.getAttr('x'))
-            u = solution[0]
-        else:
-            u = np.NaN
-        return(u)
+            n,m = X.shape
+            b = X.T @ y
+            m=grb.Model()
+            u = m.addMVar(shape = 1)
+            mu = m.addMVar(shape=n)
+            m.setObjective(1 * u, grb.GRB.MAXIMIZE)
+            m.addConstr(X.T @ mu == b)
+            m.addConstr( mu - np.ones((n,1)) @ u >= 0)
+            m.optimize()
+            if m.status == grb.GRB.Status.OPTIMAL:
+                solution = np.array(m.getAttr('x'))
+                u = solution[0]
+            else:
+                u = np.NaN
+            return(u)
     
         return poisson_coerciveness( self.C(), self.μhat_a)
 
