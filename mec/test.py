@@ -1,3 +1,5 @@
+import numpy as np
+
 def test_mec_lp_LP():
     from mec.lp import LP   
     from mec.data import load_stigler_data    
@@ -9,7 +11,6 @@ def test_mec_lp_LP():
 def test_mec_lp_Dictionary():
     from mec.lp import Dictionary
     from mec.data import load_stigler_data
-    import numpy as np
     dictionary_example = Dictionary(A_i_j = np.array([[2, 1], [1, 2]]),
                                 d_i = np.array([2,2]),
                                 c_j = np.array([1,1]),
