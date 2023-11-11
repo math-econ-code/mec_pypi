@@ -43,8 +43,7 @@ def test_mec_lp_Tableau():
 def test_mec_ot_OTProblem():
     from mec.ot import OTProblem
     from mec.data import load_DupuyGalichon_data  
-    data = load_DupuyGalichon_data()
-    [data_X,data_Y,A_k_l] = list(data)
+    [data_X,data_Y,A_k_l] =  load_DupuyGalichon_data().values()
     sdX,sdY = data_X.std().values, data_Y.std().values
     mX,mY = data_X.mean().values, data_Y.mean().values
     feats_x_k, feats_y_l = ((data_X-mX)/sdX).values, ((data_Y-mY)/sdY).values
