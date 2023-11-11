@@ -112,6 +112,27 @@ class OTProblem:
         return (μopt_a.reshape((self.nbx,-1)),uopt_x,vopt_y)
 
 
+    def solve_dual_partial_multiobj_lp(self, favor_Y = True):
+        if favor_Y:
+            welfare_weights_z = np.concatenate([np.ones(self.nbx),-np.ones(self.nby) ]) # welfare weights for each individuals
+        else:
+            welfare_weights_z = np.concatenate([-np.ones(self.nbx),np.ones(self.nby) ]) # welfare weights for each individuals
+        m=grb.Model()
+        p_z = m.addMVar(self.nbz)
+        m.ModelSense = grb.GRB.MINIMIZE
+        m.setParam('OutputFlag', 0) 
+        q_z = self.q_z()
+        m.setObjectiveN(q_z @ p_z, 0, priority = 2,weight = 1)
+        m.setObjectiveN(welfare_weights_z @ p_z,1,priority = 1, weight = 1)
+        m.addConstr(self.M_z_a().T @ p_z >= self.Φ_a)
+        m.optimize()  
+        if m.status == grb.GRB.Status.OPTIMAL:
+            #μopt_a = np.array(m.getAttr('Pi')).reshape(self.nbx,self.nby)
+            popt_z = np.array(m.getAttr('x'))
+            uopt_x, vopt_y = popt_z[:self.nbx],popt_z[self.nbx:]
+        return (uopt_x,vopt_y) # μopt_a.reshape((self.nbx,-1))
+
+
     def matrixIPFP(self,σ , tol = 1e-9, maxite = 1e+06 ): # added on D3
         ptm = time()
         ite = 0

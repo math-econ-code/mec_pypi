@@ -41,3 +41,20 @@ def load_DupuyGalichon_data( verbose=False):
     return({'data_X': data_X,
             'data_Y': data_Y,
             'A_k_l': A_k_l})
+           
+def load_ChooSiow_data(nbCateg = 25):
+    thepath = pkg_resources.resource_filename('mec', 'datasets/marriage-ChooSiow/')
+    n_singles = pd.read_csv(thepath+'n_singles.txt', sep='\t', header = None)
+    marr = pd.read_csv(thepath+'marr.txt', sep='\t', header = None)
+    navail = pd.read_csv(thepath+'n_avail.txt', sep='\t', header = None)
+    μhat_x0 = np.array(n_singles[0].iloc[0:nbCateg])
+    μhat_0y = np.array(n_singles[1].iloc[0:nbCateg])
+    μhat_xy = np.array(marr.iloc[0:nbCateg:,0:nbCateg])
+    Nhat = 2 * μhat_xy.sum() + μhat_x0.sum() + μhat_0y.sum()    
+    μhat_a = np.concatenate([μhat_xy.flatten(),μhat_x0,μhat_0y]) / Nhat # rescale the data so that the total number of individual is one
+
+    return({'μhat_a':μhat_a, 
+             'Nhat':Nhat,
+             'nbx':nbCateg,
+             'nby':nbCateg
+             }) 
