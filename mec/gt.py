@@ -32,6 +32,28 @@ class Matrix_game:
         p_i = S * xstar
         q_j = S * ystar
         return(p_i,q_j)
+        
+    def minimax_CP(self,gap_threshold = 1e-5,max_iter = 10000):
+        L1 = np.max(np.abs(self.Phi_i_j))
+        sigma, tau = 1/L1, 1/L1
+
+        p = np.ones(self.nbi) / self.nbi
+        q = np.ones(self.nbi) / self.nbj
+        q_prev = q.copy()
+
+        gap = np.inf
+        i=0
+        while (gap >  gap_threshold) and (i < max_iter):
+            q_tilde = 2*q - q_prev
+            p *= np.exp(-sigma* self.Phi_i_j @ q_tilde)
+            p /= p.sum()
+
+            q_prev = q.copy()
+            q *= np.exp(tau* self.Phi_i_j.T @ p)
+            q /= q.sum()
+            gap = np.max(self.Phi_i_j.T@p) - np.min(self.Phi_i_j@q)
+            i += 1
+        return(p,q,gap,i)
 
 
 class Bimatrix_game:
