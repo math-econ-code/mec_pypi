@@ -9,28 +9,28 @@ import matplotlib.pyplot as plt
 import tabulate as tb
 
 
+def round_expr(expr, num_digits):
+    return expr.xreplace({n : round(n, num_digits) for n in expr.atoms(Number)})
 
-#############################
-# LP1: Intro to linear programming #
-#############################
+def limited_tabulate(data, headers=None, tablefmt='grid', max_rows=18, max_cols=14):
+    if max_rows is not None and len(data) > max_rows:
+        data = data[:max_rows]
+
+    if max_cols is not None:
+        if headers:
+            headers = headers[:max_cols]
+        data = [row[:max_cols] for row in data]
+    
+    return tb.tabulate(data, headers=headers, tablefmt=tablefmt)
 
 
 
-
-
-def print_optimal_diet(q_j):
-    print('***Optimal solution***')
-    total,thelist = 0.0, []
-    for j, commodity in enumerate(commodities):
-        if q_j[j] > 0:
-            total += q_j[j] * 365
-            thelist.append([commodity,q_j[j]])
-    thelist.append(['Total cost (optimal):', total])
-    print(tb.tabulate(thelist))
 
 
 class LP():
-    def __init__(self,A_i_j,d_i,c_j,decision_var_names_j = None,slack_var_names_i = None):
+    def __init__(self,A_i_j,d_i,c_j = None,decision_var_names_j = None,slack_var_names_i = None):
+        if c_j is None:
+            c_j = np.zeros(A_i_j.shape[1])
         self.A_i_j = A_i_j
         self.nbi , self.nbj = A_i_j.shape
         self.nbk = self.nbi+self.nbj
@@ -81,28 +81,11 @@ class LP():
         if legend: ax.legend(loc='upper right')
         plt.show()
 
-#########################
-# LP2: The simplex algorithm #
-#########################
 
-def round_expr(expr, num_digits):
-    return expr.xreplace({n : round(n, num_digits) for n in expr.atoms(Number)})
-
-def limited_tabulate(data, headers=None, tablefmt='grid', max_rows=18, max_cols=14):
-    if max_rows is not None and len(data) > max_rows:
-        data = data[:max_rows]
-
-    if max_cols is not None:
-        if headers:
-            headers = headers[:max_cols]
-        data = [row[:max_cols] for row in data]
-    
-    return tb.tabulate(data, headers=headers, tablefmt=tablefmt)
 
 class Dictionary(LP):
-    def __init__(self, A_i_j, d_i, c_j = None , slack_var_names_i=None,decision_var_names_j=None): # s_i = d_i - A_i_j @ x_j
-        if c_j is None:
-            c_j = np.zeros(A_i_j.shape[1])
+    def __init__(self, A_i_j, d_i, c_j = None , slack_var_names_i=None,decision_var_names_j=None): 
+        # s_i = d_i - A_i_j @ x_j
         LP.__init__(self,A_i_j, d_i, c_j,decision_var_names_j,slack_var_names_i)
         self.nonbasic = symbols(self.decision_var_names_j)
         self.base = { Symbol('obj') : c_j @ self.nonbasic }
@@ -203,16 +186,13 @@ class Dictionary(LP):
         
 class Tableau(LP):
     def __init__(self, A_i_j, d_i, c_j = None,slack_var_names_i=None, decision_var_names_j = None): 
-    # s_i = d_i - (A_i_j @ x_j
-        LP.__init__(self,A_i_j, d_i, c_j,decision_var_names_j,slack_var_names_i)
-        self.nbi,self.nbj = A_i_j.shape
-        if c_j is None:
-            c_j = np.zeros(self.nbj)
-        self.nbk = self.nbi+self.nbj
+        # s_i = d_i - (A_i_j @ x_j
+        LP.__init__(self, A_i_j, d_i, c_j, decision_var_names_j, slack_var_names_i)
         self.names_all_variables =  self.slack_var_names_i + self.decision_var_names_j
-        self.tableau = np.block([[np.zeros((1,self.nbi)), c_j.reshape((1,-1)), 0],[np.eye(self.nbi),A_i_j,d_i.reshape((-1,1))]])
-        self.k_b = list(range(self.nbi)) # columns associated with basic variables
-        self.i_b = list(range(1,1+self.nbi)) # rows associated with basic variables
+        self.tableau = np.block([[np.zeros((1,self.nbi)), c_j.reshape((1,-1)), 0],
+                                 [np.eye(self.nbi),A_i_j,d_i.reshape((-1,1))]])
+        self.k_b = {b: b for b in range(self.nbi)}   # columns associated with basic variables
+        self.i_b = {b: b+1 for b in range(self.nbi)} # rows associated with basic variables
 
     def display(self):
         tableau = []
@@ -229,7 +209,7 @@ class Tableau(LP):
                 return k
         return None # If no entering variable found, None returned
 
-    def determine_departing(self,kent):
+    def determine_departing2(self,kent):
         thedic = {b: self.tableau[self.i_b[b],-1] / self.tableau[self.i_b[b],kent] 
                   for b in range(self.nbi) if self.tableau[self.i_b[b],kent]>0}
         bdep = min(thedic, key = thedic.get)
@@ -281,9 +261,9 @@ class Tableau(LP):
         return(x_j,y_i,x_j@self.c_j)
     
 
-#########################
-# LP3: Interior Point Methods #
-#########################
+##########################################
+######### Interior Point Methods #########
+##########################################
 
 class InteriorPoint():
     def __init__(self, A, b, c, current_point=None):

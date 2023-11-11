@@ -24,6 +24,16 @@ def load_stigler_data(nbi = 9, nbj = 77, verbose=False):
             'names_j':commodities[0:nbj]}) 
 
 
+def print_optimal_diet_stigler_data(q_j):
+    print('***Optimal solution***')
+    total,thelist = 0.0, []
+    for j, commodity in enumerate(commodities):
+        if q_j[j] > 0:
+            total += q_j[j] * 365
+            thelist.append([commodity,q_j[j]])
+    thelist.append(['Total cost (optimal):', total])
+    print(tb.tabulate(thelist))
+
 def load_DupuyGalichon_data( verbose=False):
     thepath =data_file_path = pkg_resources.resource_filename('mec', 'datasets/marriage_personality-traits/')
     data_X = pd.read_csv(thepath + "Xvals.csv")
