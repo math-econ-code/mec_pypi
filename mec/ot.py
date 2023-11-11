@@ -226,6 +226,28 @@ class TUlogit: # added on D5
         outcome = optimize.minimize(ObjFunc,jac = grad_ObjFunc,args=(scale,self), method = 'CG', x0=uvl_0,options={'gtol':tol,'disp': True})
         return  outcome['x'][0:-self.nbk]/scale,outcome['x'][-self.nbk:]/scale
 
+
+
+    def isCoercive(self):
+        def poisson_coerciveness(X,y):
+        n,m = X.shape
+        b = X.T @ y
+        m=grb.Model()
+        u = m.addMVar(shape = 1)
+        mu = m.addMVar(shape=n)
+        m.setObjective(1 * u, grb.GRB.MAXIMIZE)
+        m.addConstr(X.T @ mu == b)
+        m.addConstr( mu - np.ones((n,1)) @ u >= 0)
+        m.optimize()
+        if m.status == grb.GRB.Status.OPTIMAL:
+            solution = np.array(m.getAttr('x'))
+            u = solution[0]
+        else:
+            u = np.NaN
+        return(u)
+    
+        return poisson_coerciveness( self.C(), self.μhat_a)
+
     def assess(self,θ):
         C= self.C()
         return np.abs((np.exp(C @ θ) - self.μhat_a).reshape((1,-1)) @ C).max()
