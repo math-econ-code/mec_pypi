@@ -144,10 +144,10 @@ def test_mec_gt():
 def test_mec():
     print('Linear programming tests:\n'+'*'*30)
     test_mec_lp()
-    print('Optimal transport tests:\n'+'*'*30)
+    print('*'*30+'\nOptimal transport tests:\n'+'*'*30)
     test_mec_ot()
-    print('Game theory tests:\n'+'*'*30)
+    print('*'*30+'\nGame theory tests:\n'+'*'*30)
     test_mec_gt()
-    print(' All tests completed successfully.')
+    print('*'*30+'\n'+'*'*30+'\nAll tests completed successfully.')
     return
     

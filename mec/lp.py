@@ -189,7 +189,7 @@ class Tableau(LP):
         # s_i = d_i - (A_i_j @ x_j
         LP.__init__(self, A_i_j, d_i, c_j, decision_var_names_j, slack_var_names_i)
         self.names_all_variables =  self.slack_var_names_i + self.decision_var_names_j
-        self.tableau = np.block([[np.zeros((1,self.nbi)), c_j.reshape((1,-1)), 0],
+        self.tableau = np.block([[np.zeros((1,self.nbi)), self.c_j.reshape((1,-1)), 0],
                                  [np.eye(self.nbi),A_i_j,d_i.reshape((-1,1))]])
         self.k_b = np.arange(self.nbi)   # columns associated with basic variables
         self.i_b = np.arange(1,1+self.nbi) # rows associated with basic variables
