@@ -191,8 +191,8 @@ class Tableau(LP):
         self.names_all_variables =  self.slack_var_names_i + self.decision_var_names_j
         self.tableau = np.block([[np.zeros((1,self.nbi)), c_j.reshape((1,-1)), 0],
                                  [np.eye(self.nbi),A_i_j,d_i.reshape((-1,1))]])
-        self.k_b = {b: b for b in range(self.nbi)}   # columns associated with basic variables
-        self.i_b = {b: b+1 for b in range(self.nbi)} # rows associated with basic variables
+        self.k_b = list(range(self.nbi))   # columns associated with basic variables
+        self.i_b = list(range(1,1+self.nbi)) # rows associated with basic variables
 
     def display(self):
         tableau = []
@@ -210,12 +210,13 @@ class Tableau(LP):
         return None # If no entering variable found, None returned
 
     def determine_departing2(self,kent):
-        thedic = {b: self.tableau[self.i_b[b],-1] / self.tableau[self.i_b[b],kent] 
+        thedic = {self.k_b[b]: self.tableau[self.i_b[b],-1] / self.tableau[self.i_b[b],kent] 
                   for b in range(self.nbi) if self.tableau[self.i_b[b],kent]>0}
-        bdep = min(thedic, key = thedic.get)
-        return bdep
+        kdep = min(thedic, key = thedic.get)
+        return kdep
 
-    def update(self,kent,bdep):
+    def update2(self,kent,kdep):
+        bdep = int(np.where(self.k_b == kdep)[0]) 
         idep = self.i_b[bdep]
         self.tableau[idep,:] = self.tableau[idep,:] / self.tableau[idep,kent] 
         for i in range(1+self.nbi):
@@ -230,12 +231,11 @@ class Tableau(LP):
             self.display()
         kent = self.determine_entering()
         if kent is not None:
-            bdep= self.determine_departing(kent)
-            name_entering = self.names_all_variables[kent]
-            name_departing = self.names_all_variables[self.i_b[bdep]]
+            kdep= self.determine_departing(kent)
             if verbose>0:
-                print('Entering=', name_entering, 'Departing=',name_departing,'Pivot=',(self.i_b[bdep],kent))
-            self.update(kent,bdep)
+                bdep = int(np.where(self.k_b == kdep)[0])  
+                print('Entering=', self.names_all_variables[kent], 'Departing=',self.names_all_variables[self.i_b[bdep]],'Pivot=',(self.i_b[bdep],kent))
+            self.update(kent,kdep)
         else:
             if verbose>0:
                 print ('Optimal solution found.')
@@ -259,7 +259,6 @@ class Tableau(LP):
                 x_j[self.k_b[b]-self.nbi] = self.tableau[self.i_b[b],-1]
         y_i = - self.tableau[0,:self.nbi] 
         return(x_j,y_i,x_j@self.c_j)
-    
 
 ##########################################
 ######### Interior Point Methods #########

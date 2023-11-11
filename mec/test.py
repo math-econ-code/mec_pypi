@@ -137,6 +137,7 @@ def test_mec_ot():
     
 def test_mec_gt():
     test_mec_gt_Matrix_game
+    test_mec_gt_Bimatrix_game
     
     return
 
