@@ -1,9 +1,10 @@
 import pkg_resources
+import pandas as pd
+import tabulate
 
 def load_stigler_data(nbi = 9, nbj = 77, verbose=False):
-    import pandas as pd
-    #thepath = 'https://raw.githubusercontent.com/math-econ-code/mec_optim_2021-01/master/data_mec_optim/lp_stigler-diet/StiglerData1939.txt'
-    thepath =data_file_path = pkg_resources.resource_filename('mec', 'datasets/StiglerData1939.txt')
+
+    thepath =data_file_path = pkg_resources.resource_filename('mec', 'datasets/stigler-diet/StiglerData1939.txt')
     thedata = pd.read_csv(thepath , sep='\t')
     thedata = thedata.dropna(how = 'all')
     commodities = (thedata['Commodity'].values)[:-1]
@@ -20,3 +21,20 @@ def load_stigler_data(nbi = 9, nbj = 77, verbose=False):
             'c_j':np.ones(len(commodities))[0:nbj],
             'names_i': list(thedata.columns)[4:(4+nbi)],
             'names_j':commodities[0:nbj]}) 
+
+
+def load_DupuyGalichon_data( verbose=False):
+    thepath =data_file_path = pkg_resources.resource_filename('mec', 'datasets/marriage_personality-traits/')
+    data_X = pd.read_csv(thepath + "Xvals.csv")
+    data_Y = pd.read_csv(thepath + "Yvals.csv")
+    aff_data = pd.read_csv(thepath + "affinitymatrix.csv")
+    A_k_l = aff_data.iloc[0:nbk,1:nbl+1].values
+
+    if verbose:
+        print(data_X.head())
+        print(data_Y.head())
+        print(tabulate(A_k_l))
+        
+    return({'data_X': data_X,
+            'data_Y': data_Y,
+            'A_k_l': A_k_l})
