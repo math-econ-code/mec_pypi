@@ -100,7 +100,7 @@ class Bimatrix_game:
 
 
 
-class ScarfDoublePivot:
+class TwoBases:
     def __init__(self,C_i_j,A_i_j,d_i = None):
         self.nbi,self.nbj = C_i_j.shape
         self.C_i_j = C_i_j
@@ -152,10 +152,9 @@ class ScarfDoublePivot:
                         decision_var_names_j =[str(i) for i in range(self.nbi,self.nbj)] )
         self.basis_C = list(range(self.nbi))
         self.basis_C.remove(j_removed)
-        entvar = self.nbi+self.C_i_j[j_removed,self.nbi:].argmax()
-        self.basis_C.append(entvar)
-        self.entvar = entvar
-        return 
+        j_entering = self.nbi+self.C_i_j[j_removed,self.nbi:].argmax()
+        self.basis_C.append(j_entering)
+        return j_entering
     
         
     def continue_C(self,departing):
@@ -170,30 +169,29 @@ class ScarfDoublePivot:
         return cstar
         
     
-    def step(self,verbose= 0):
+    def step(self,entvar ,verbose= 0):
         self.nbstep += 1
-        basis_A =  self.tableau_A.k_b.copy() 
-        depvar = self.tableau_A.determine_departing(self.entvar)
+        basis_A =  set(self.tableau_A.k_b)
+        depvar = self.tableau_A.determine_departing(entvar)
         depcol = self.tableau_A.k_b[depvar]
-        self.tableau_A.update(self.entvar,depvar)
+        self.tableau_A.update(entvar,depvar)
         if set(self.basis_C) == set(self.tableau_A.k_b):
             if verbose>0:
                 print('Step=', self.nbstep)
-                print('Solution found. Basis=',set([a+1 for a in self.basis_C]) )
-            return True
+                print('Solution found. Basis=',set(self.basis_C) )
+            return False
         ####
         u_i = self.u_i(self.basis_C)
         c0 = self.continue_C(depcol)
         ### 
         if verbose>0:
             print('Step=', self.nbstep)
-            print('A basis = ' ,set([a+1 for a in basis_A]))
-            print('C basis = ' ,set([c+1 for c in self.basis_C]+[depcol+1]))
+            print('A basis = ' ,basis_A)
+            print('C basis = ' ,set(self.basis_C))
             print('u_i=',u_i )
-            print('entering var (A)=',self.entvar+1)
-            print('departing var (A and C)=',depcol+1)
-            print('entering var (C)=',c0+1)
+            print('entering var (A)=',entvar)
+            print('departing var (A and C)=',depcol)
+            print('entering var (C)=',c0)
         self.basis_C.append(c0)
 
-        self.entvar = c0
-        return False
+        return c0
