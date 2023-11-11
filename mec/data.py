@@ -1,3 +1,4 @@
+import numpy as np
 import pkg_resources
 import pandas as pd
 import tabulate
