@@ -130,14 +130,14 @@ def test_mec_lp():
 
 
 def test_mec_ot():
-    test_mec_ot_OTProblem
+    test_mec_ot_OTProblem()
     test_mec_ot_TULogit()
     
     return
     
 def test_mec_gt():
-    test_mec_gt_Matrix_game
-    test_mec_gt_Bimatrix_game
+    test_mec_gt_Matrix_game()
+    test_mec_gt_Bimatrix_game()
     
     return
 

@@ -209,13 +209,13 @@ class Tableau(LP):
                 return k
         return None # If no entering variable found, None returned
 
-    def determine_departing2(self,kent):
+    def determine_departing(self,kent):
         thedic = {self.k_b[b]: self.tableau[self.i_b[b],-1] / self.tableau[self.i_b[b],kent] 
                   for b in range(self.nbi) if self.tableau[self.i_b[b],kent]>0}
         kdep = min(thedic, key = thedic.get)
         return kdep
 
-    def update2(self,kent,kdep):
+    def update(self,kent,kdep):
         bdep = int(np.where(self.k_b == kdep)[0]) 
         idep = self.i_b[bdep]
         self.tableau[idep,:] = self.tableau[idep,:] / self.tableau[idep,kent] 
@@ -231,12 +231,12 @@ class Tableau(LP):
             self.display()
         kent = self.determine_entering()
         if kent is not None:
-            kdep= self.determine_departing2(kent)
+            kdep= self.determine_departing(kent)
             if verbose>0:
                 
                 bdep = int(np.where(self.k_b == kdep)[0])  
                 print('Entering=', self.names_all_variables[kent], 'Departing=',self.names_all_variables[self.i_b[bdep]],'Pivot=',(self.i_b[bdep],kent))
-            self.update2(kent,kdep)
+            self.update(kent,kdep)
         else:
             if verbose>0:
                 print ('Optimal solution found.')
