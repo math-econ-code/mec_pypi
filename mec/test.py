@@ -20,7 +20,7 @@ def test_mec_lp_Dictionary():
     path_example = [dictionary_example.primal_solution(verbose=1)]
     dictionary_example.plot2d(path_example)
     dictionary_example.simplex_loop(verbose=3)
-    [N_i_j,minallowance_i,unitcost_j,_,_] = mec.dataload_stigler_data(7,5).values()
+    [N_i_j,minallowance_i,unitcost_j,_,_] = mec.data.load_stigler_data(7,5).values()
     stigler_dictionary = Dictionary(N_i_j.T, unitcost_j , minallowance_i,
                              ['s_' + str(j) for j in range(N_i_j.shape[1])],
                              ['π_' + str(i) for i in range(N_i_j.shape[0])])
