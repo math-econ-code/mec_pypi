@@ -67,7 +67,21 @@ def test_mec_ot_OTProblem():
 
     return
     
-def test_mec_lp_TULogit():
+def test_mec_ot_TULogit():
+    def build_surplus(nbx,nby):
+        xs, ys = np.repeat(range(1,nbx+1),nby).reshape(nbx,nby)/nbx, np.repeat(range(1,nby+1),nbx).reshape(nbx,nby).T/nby
+        phi1_xy = -((xs-ys)**2).flatten()
+        phimat = np.vstack([phi1_xy,
+                            -((xs-ys)**2 * ((xs+ys)/2)**2).flatten(),
+                             -( (xs-ys)**2 * ((xs+ys-2)/2)**2).flatten(),
+                            -( (xs-ys)**2 *(xs+ys-1)**2).flatten()
+                           ]).T
+        phimat_mean = phimat.mean(axis = 0 , keepdims=True)
+        phimat_stdev = phimat.std(axis = 0 , keepdims=True)
+        φ_xy_k = np.hstack([np.ones((nbx*nby,1)) ,(phimat - phimat_mean)/phimat_stdev]  )
+        _,nbk = φ_xy_k.shape
+        return np.vstack( [φ_xy_k ,np.zeros( (nbx,nbk) ),np.zeros( (nby,nbk) )])
+
     from mec.ot import TUlogit
     [cs_μhat_a, cs_Nhat,cs_nbx,cs_nby] = mec.data.load_ChooSiow_data().values()
     choo_siow_mkt = TUlogit(cs_nbx,cs_nby,build_surplus(cs_nbx,cs_nby),cs_μhat_a)  
@@ -86,12 +100,12 @@ def test_mec_lp():
     test_mec_lp_LP()
     test_mec_lp_Dictionary()
     test_mec_lp_Tableau()
-    test_mec_lp_TULogit()
     return
 
 
 def test_mec_ot():
     test_mec_ot_OTProblem
+    test_mec_ot_TULogit()
     
     return
 
