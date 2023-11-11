@@ -63,7 +63,3 @@ def test_mec():
     test_mec_gt()
     return
     
-
-test_mec_lp_LP()
-test_mec_lp_Dictionary()
-test_mec_lp_Tableau()
