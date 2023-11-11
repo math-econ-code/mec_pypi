@@ -191,8 +191,8 @@ class Tableau(LP):
         self.names_all_variables =  self.slack_var_names_i + self.decision_var_names_j
         self.tableau = np.block([[np.zeros((1,self.nbi)), c_j.reshape((1,-1)), 0],
                                  [np.eye(self.nbi),A_i_j,d_i.reshape((-1,1))]])
-        self.k_b = list(range(self.nbi))   # columns associated with basic variables
-        self.i_b = list(range(1,1+self.nbi)) # rows associated with basic variables
+        self.k_b = np.arange(self.nbi)   # columns associated with basic variables
+        self.i_b = np.arange(1,1+self.nbi) # rows associated with basic variables
 
     def display(self):
         tableau = []
@@ -233,6 +233,7 @@ class Tableau(LP):
         if kent is not None:
             kdep= self.determine_departing2(kent)
             if verbose>0:
+                
                 bdep = int(np.where(self.k_b == kdep)[0])  
                 print('Entering=', self.names_all_variables[kent], 'Departing=',self.names_all_variables[self.i_b[bdep]],'Pivot=',(self.i_b[bdep],kent))
             self.update2(kent,kdep)
@@ -259,7 +260,6 @@ class Tableau(LP):
                 x_j[self.k_b[b]-self.nbi] = self.tableau[self.i_b[b],-1]
         y_i = - self.tableau[0,:self.nbi] 
         return(x_j,y_i,x_j@self.c_j)
-
 ##########################################
 ######### Interior Point Methods #########
 ##########################################
