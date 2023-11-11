@@ -1,7 +1,7 @@
 import numpy as np
 import pkg_resources
 import pandas as pd
-import tabulate
+import tabulate as tb
 
 def load_stigler_data(nbi = 9, nbj = 77, verbose=False):
 
@@ -14,7 +14,7 @@ def load_stigler_data(nbi = 9, nbj = 77, verbose=False):
     nbj = min(len(commodities),nbj)
     if verbose:
         print('Daily nutrient content:')
-        print(tabulate(thedata.head()))
+        print(tb.tabulate(thedata.head()))
         print('\nDaily nutrient requirement:')
         print(allowance)
     return({'N_i_j':thedata.iloc[:nbj, 4:(4+nbi)].fillna(0).to_numpy().T,
@@ -34,7 +34,7 @@ def load_DupuyGalichon_data( verbose=False):
     if verbose:
         print(data_X.head())
         print(data_Y.head())
-        print(tabulate(A_k_l))
+        print(tb.tabulate(A_k_l))
         
     return({'data_X': data_X,
             'data_Y': data_Y,
