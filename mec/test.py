@@ -93,8 +93,34 @@ def test_mec_ot_TULogit():
     print(choo_siow_mkt.assess(np.append(uv_GS_diy, λ_GS_diy_k)))
     choo_siow_mkt.isCoercive()
     return
-    
+########################################################
+########################################################
+def test_mec_gt_Matrix_game():
+    from mec.gt import Matrix_game
+    Phi_i_j = np.array([[50, 100, 93.8], 
+                    [93.9, 60.0, 82.8], 
+                    [97.6, 100, 73.2]])
+    thegame = Matrix_game(Phi_i_j)
+    print(thegame.BRI(1) ,thegame.BRJ(0) )
+    thegame.compute_eq()
+    thegame.minimax_LP()
+    thegame.minimax_CP()
 
+
+
+def test_mec_gt_Bimatrix_game():
+    from mec.gt import Bimatrix_game
+    penalty_data = np.array([[50, 100, 93.8], [93.9, 60.0, 82.8], [97.6, 100, 73.2]])
+
+    penalty_zero_sum = Bimatrix_game(A_i_j = penalty_data, B_i_j = 100 - penalty_data)
+    penalty_nonzero_sum = Bimatrix_game(A_i_j = penalty_data,
+                                    B_i_j = np.array([[150, 100, 100], [100, 150, 100], [100, 100, 150]]) - penalty_data)
+    penalty_zero_sum.mangasarian_stone_solve()
+    penalty_nonzero_sum.lemke_howson_solve()
+
+########################################################
+########################################################
+########################################################
 
 def test_mec_lp():
     test_mec_lp_LP()
@@ -106,6 +132,11 @@ def test_mec_lp():
 def test_mec_ot():
     test_mec_ot_OTProblem
     test_mec_ot_TULogit()
+    
+    return
+    
+def test_mec_gt():
+    test_mec_gt_Matrix_game
     
     return
 

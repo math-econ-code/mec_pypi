@@ -81,6 +81,7 @@ class Bimatrix_game:
         return(sol_dict)
         
     def lemke_howson_solve(self,verbose = 0):
+        from sympy import Symbol
         
         ris = ['r_' + str(i+1) for i in range(self.nbi)]
         yjs = ['y_' + str(self.nbi+j+1) for j in range(self.nbj)]
