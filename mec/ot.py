@@ -225,3 +225,7 @@ class TUlogit: # added on D5
         uvl_0 = np.repeat(0,self.nbx+self.nby+self.nbk)
         outcome = optimize.minimize(ObjFunc,jac = grad_ObjFunc,args=(scale,self), method = 'CG', x0=uvl_0,options={'gtol':tol,'disp': True})
         return  outcome['x'][0:-self.nbk]/scale,outcome['x'][-self.nbk:]/scale
+
+    def assess(self,θ):
+        C= self.C()
+        return np.abs((np.exp(C @ θ) - self.μhat_a).reshape((1,-1)) @ C).max()
