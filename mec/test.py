@@ -67,8 +67,8 @@ def test_mec_ot_OTProblem():
 
     return
     
-def test_TULogit():
-    from mec.ot import TULogit
+def test_mec_lp_TULogit():
+    from mec.ot import TUlogit
     [cs_μhat_a, cs_Nhat,cs_nbx,cs_nby] = mec.data.load_ChooSiow_data().values()
     choo_siow_mkt = TUlogit(cs_nbx,cs_nby,build_surplus(cs_nbx,cs_nby),cs_μhat_a)  
     uv_GS_diy,λ_GS_diy_k = choo_siow_mkt.fit_diy(10000,tol = 1e-8)
@@ -86,6 +86,7 @@ def test_mec_lp():
     test_mec_lp_LP()
     test_mec_lp_Dictionary()
     test_mec_lp_Tableau()
+    test_mec_lp_TULogit()
     return
 
 
