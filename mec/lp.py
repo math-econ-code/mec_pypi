@@ -235,7 +235,7 @@ class Tableau(LP):
             if verbose>0:
                 bdep = int(np.where(self.k_b == kdep)[0])  
                 print('Entering=', self.names_all_variables[kent], 'Departing=',self.names_all_variables[self.i_b[bdep]],'Pivot=',(self.i_b[bdep],kent))
-            self.update(kent,kdep)
+            self.update2(kent,kdep)
         else:
             if verbose>0:
                 print ('Optimal solution found.')
