@@ -1,3 +1,5 @@
+import pkg_resources
+
 def load_stigler_data(nbi = 9, nbj = 77, verbose=False):
     import pandas as pd
     #thepath = 'https://raw.githubusercontent.com/math-econ-code/mec_optim_2021-01/master/data_mec_optim/lp_stigler-diet/StiglerData1939.txt'

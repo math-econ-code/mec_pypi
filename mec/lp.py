@@ -7,7 +7,7 @@ from sympy.solvers import solve
 from sympy import *
 import matplotlib.pyplot as plt
 from tabulate import tabulate
-import pkg_resources
+
 
 
 #############################
