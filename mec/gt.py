@@ -120,12 +120,14 @@ class Bimatrix_game:
         sol_dict = {'val1':val1, 'val2':val2, 'p_i':p_i,'q_j':q_j}
         return(sol_dict)
 
-
-
-
+import numpy as np
+from mec.lp import Tableau
 
 class TwoBases:
-    def __init__(self,C_i_j,A_i_j,d_i = None):
+    def __init__(self,C_i_j,A_i_j,d_i=None,M=None,eps=1e-5):
+        if M is None:
+            M = C_i_j.max()
+        self.nbstep,self.M,self.eps = 1,M,eps
         self.nbi,self.nbj = C_i_j.shape
         self.C_i_j = C_i_j
         self.A_i_j = A_i_j
@@ -133,30 +135,50 @@ class TwoBases:
             self.d_i = np.ones(self.nbi)
         else:
             self.d_i = d_i
+        # remove degeneracies:
+        self.C_i_j += np.arange(self.nbj,0,-1)[None,:]* (self.C_i_j == self.M)
+        self.d_i = self.d_i + np.arange(1,self.nbi+1)*self.eps
+        # create an A and a C basis
+        self.tableau_A = Tableau( self.A_i_j[:,self.nbi:self.nbj], d_i = self.d_i )
+        self.basis_C = list(range(self.nbi))
         ###
+        
+    def init_j_entering(self,j_removed):
+        self.basis_C.remove(j_removed)
+        j_entering = self.nbi+self.C_i_j[j_removed,self.nbi:].argmax()
+        self.basis_C.append(j_entering)
+        self.entvar = j_entering
+        return j_entering
+    
+    def get_basis_A(self):
+        return set(self.tableau_A.k_b)
+    
+    def get_basis_C(self):
+        return set(scarf_example.basis_C)
 
     def is_standard_form(self):
         cond_1 = (np.diag(self.C_i_j)  == self.C_i_j.min(axis = 1) ).all() 
         cond_2 = ((self.C_i_j[:,:self.nbi] + np.diag([np.inf] * self.nbi)).min(axis=1) >= self.C_i_j[:,self.nbi:].max(axis=1)).all()
         return (cond_1 & cond_2)
     
-    def remove_degeneracies(self, eps = 1e-5):
-        self.d_i = self.d_i + np.arange(1,self.nbi+1)*eps
         
-    def u_i(self,basis):
-        return self.C_i_j[:,basis].min(axis = 1)
+    def u_i(self,basis=None):
+        if basis is None:
+            basis = self.get_basis_C()
+        return self.C_i_j[:,list(basis)].min(axis = 1)    
     
     def xsol_j(self,basis=None):
         if basis is None:
-            basis = self.basis_C
-        B = self.A_i_j[:,basis]
+            basis = self.get_basis_A()
+        B = self.A_i_j[:,list(basis)]
         x_j = np.zeros(self.nbj)
-        x_j[basis] = np.linalg.solve(B,self.d_i)
+        x_j[list(basis)] = np.linalg.solve(B,self.d_i)
         return x_j
+
     
     def is_feasible_basis(self,basis):    
         try:
-            if self.xsol_j(basis).min()>=0:
+            if self.xsol_j(list(basis) ).min()>=0:
                 return True
         except np.linalg.LinAlgError:
             pass
@@ -165,57 +187,53 @@ class TwoBases:
     def is_ordinal_basis(self,basis):
         res=False
         if len(set(basis))==self.nbi:
-            res = (self.u_i(basis)[:,None] >= self.C_i_j).any(axis = 0).all()
+            res = (self.u_i(list(basis) )[:,None] >= self.C_i_j).any(axis = 0).all()
         return res
-
-       
-    def init_algo(self,j_removed):
-        self.nbstep = 0
-        self.tableau_A = Tableau( self.A_i_j[:,self.nbi:self.nbj], d_i = self.d_i, c_j = np.zeros(self.nbj-self.nbi), 
-                        slack_var_names_i = [str(i) for i in range(self.nbi)],
-                        decision_var_names_j =[str(i) for i in range(self.nbi,self.nbj)] )
-        self.basis_C = list(range(self.nbi))
-        self.basis_C.remove(j_removed)
-        j_entering = self.nbi+self.C_i_j[j_removed,self.nbi:].argmax()
-        self.basis_C.append(j_entering)
-        return j_entering
     
-        
-    def continue_C(self,departing):
+    
+    def determine_entering(self,depcol):
+        self.nbstep += 1
         ubefore_i = self.u_i(self.basis_C)
-        self.basis_C.remove(departing)
+        self.basis_C.remove(depcol)
         uafter_i = self.u_i(self.basis_C)
         i0 = np.where(ubefore_i < uafter_i)[0][0]
         c0 = min([(c,self.C_i_j[i0,c]) for c in self.basis_C  ],key = lambda x: x[1])[0]
         istar = [i for i in range(self.nbi) if uafter_i[i] == self.C_i_j[i,c0] and i != i0][0]
         eligible_columns = [c for c in range(self.nbj) if min( [self.C_i_j[i,c] - uafter_i[i] for i in range(self.nbi) if i != istar]) >0 ]
-        cstar = max([(c,self.C_i_j[istar,c]) for c in eligible_columns], key = lambda x: x[1])[0]
-        return cstar
+        entcol = max([(c,self.C_i_j[istar,c]) for c in eligible_columns], key = lambda x: x[1])[0]
+        self.basis_C.append(entcol)
+        return entcol
+        
         
     
-    def step(self,entvar ,verbose= 0):
-        self.nbstep += 1
-        basis_A =  set(self.tableau_A.k_b)
-        depvar = self.tableau_A.determine_departing(entvar)
-        depcol = self.tableau_A.k_b[depvar]
-        self.tableau_A.update(entvar,depvar)
-        if set(self.basis_C) == set(self.tableau_A.k_b):
+    def step(self,entcol ,verbose= 0):
+        depcol = self.tableau_A.determine_departing(entcol)
+        self.tableau_A.update(entcol,depcol)
+        
+        if self.get_basis_A() ==self.get_basis_C():
             if verbose>0:
-                print('Step=', self.nbstep)
-                print('Solution found. Basis=',set(self.basis_C) )
+                print('Solution found in '+ str(self.nbstep)+' steps. Basis=',self.get_basis_C() )
             return False
-        ####
-        u_i = self.u_i(self.basis_C)
-        c0 = self.continue_C(depcol)
-        ### 
-        if verbose>0:
-            print('Step=', self.nbstep)
-            print('A basis = ' ,basis_A)
-            print('C basis = ' ,set(self.basis_C))
-            print('u_i=',u_i )
-            print('entering var (A)=',entvar)
-            print('departing var (A and C)=',depcol)
-            print('entering var (C)=',c0)
-        self.basis_C.append(c0)
+            
+        new_entcol = self.determine_entering(depcol)
 
-        return c0
+        if verbose>1:
+            print('Step=', self.nbstep)
+            print('A basis = ' ,self.get_basis_A() )
+            print('C basis = ' ,self.get_basis_C() )
+            print('u_i=',self.u_i(list(self.get_basis_C()) ))
+            print('entering var (A)=',entcol)
+            print('departing var (A and C)=',depcol)
+            print('entering var (C)=',new_entcol)
+
+        return new_entcol
+
+
+    def solve(self,depcol = 0, verbose=0):
+        entcol = self.init_j_entering(depcol)
+        while entcol:
+            entcol = self.step(entcol,verbose)
+        return({'basis': self.get_basis_C(),
+                'x_j':self.xsol_j(),
+                'u_i':self.u_i()})
+
