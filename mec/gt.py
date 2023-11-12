@@ -154,7 +154,7 @@ class TwoBases:
         return set(self.tableau_A.k_b)
     
     def get_basis_C(self):
-        return set(scarf_example.basis_C)
+        return set(self.basis_C)
 
     def is_standard_form(self):
         cond_1 = (np.diag(self.C_i_j)  == self.C_i_j.min(axis = 1) ).all() 
