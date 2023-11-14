@@ -125,17 +125,17 @@ from mec.lp import Tableau
 
 
 class TwoBases:
-    def __init__(self,Phi_z_a,M_z_a,q_z=None,M=None,eps=1e-5):
+    def __init__(self,Phi_and_M,q_z=None,M=None,eps=1e-5):
+        self.Phi_z_a,self.M_z_a = Phi_and_M
         if M is None:
-            M = Phi_z_a.max()
+            M = self.Phi_z_a.max()
         self.nbstep,self.M,self.eps = 1,M,eps
-        self.nbz,self.nba = Phi_z_a.shape
-        self.Phi_z_a = Phi_z_a
-        self.M_z_a = M_z_a
+        self.nbz,self.nba = self.Phi_z_a.shape
         if q_z is  None:
             self.q_z = np.ones(self.nbz)
         else:
             self.q_z = q_z
+        
         # remove degeneracies:
         self.Phi_z_a += np.arange(self.nba,0,-1)[None,:]* (self.Phi_z_a == self.M)
         self.q_z = self.q_z + np.arange(1,self.nbz+1)*self.eps
@@ -186,10 +186,12 @@ class TwoBases:
         return False
         
     def is_ordinal_basis(self,basis):
-        res=False
+        res, which =False,None
         if len(set(basis))==self.nbz:
-            res = (self.p_z(list(basis) )[:,None] >= self.Phi_z_a).any(axis = 0).all()
-        return res
+            blocking = (self.Phi_z_a[:,basis].min(axis = 1)[:,None] < self.Phi_z_a).all(axis = 0)
+            if blocking.any():
+                which = np.where(blocking)
+        return res, which
     
     
     def determine_entering(self,a_departing):
