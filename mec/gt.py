@@ -123,62 +123,63 @@ class Bimatrix_game:
 import numpy as np
 from mec.lp import Tableau
 
+
 class TwoBases:
-    def __init__(self,C_i_j,A_i_j,d_i=None,M=None,eps=1e-5):
+    def __init__(self,Phi_z_a,M_z_a,q_z=None,M=None,eps=1e-5):
         if M is None:
-            M = C_i_j.max()
+            M = Phi_z_a.max()
         self.nbstep,self.M,self.eps = 1,M,eps
-        self.nbi,self.nbj = C_i_j.shape
-        self.C_i_j = C_i_j
-        self.A_i_j = A_i_j
-        if d_i is  None:
-            self.d_i = np.ones(self.nbi)
+        self.nbz,self.nba = Phi_z_a.shape
+        self.Phi_z_a = Phi_z_a
+        self.M_z_a = M_z_a
+        if q_z is  None:
+            self.q_z = np.ones(self.nbz)
         else:
-            self.d_i = d_i
+            self.q_z = q_z
         # remove degeneracies:
-        self.C_i_j += np.arange(self.nbj,0,-1)[None,:]* (self.C_i_j == self.M)
-        self.d_i = self.d_i + np.arange(1,self.nbi+1)*self.eps
-        # create an A and a C basis
-        self.tableau_A = Tableau( self.A_i_j[:,self.nbi:self.nbj], d_i = self.d_i )
-        self.basis_C = list(range(self.nbi))
+        self.Phi_z_a += np.arange(self.nba,0,-1)[None,:]* (self.Phi_z_a == self.M)
+        self.q_z = self.q_z + np.arange(1,self.nbz+1)*self.eps
+        # create an M and a Phi basis
+        self.tableau_M = Tableau( self.M_z_a[:,self.nbz:self.nba], q_z = self.q_z )
+        self.basis_Phi = list(range(self.nbz))
         ###
         
-    def init_j_entering(self,j_removed):
-        self.basis_C.remove(j_removed)
-        j_entering = self.nbi+self.C_i_j[j_removed,self.nbi:].argmax()
-        self.basis_C.append(j_entering)
-        self.entvar = j_entering
-        return j_entering
+    def init_a_entering(self,a_removed):
+        self.basis_Phi.remove(a_removed)
+        a_entering = self.nbz+self.Phi_z_a[a_removed,self.nbz:].argmax()
+        self.basis_Phi.append(a_entering)
+        self.entvar = a_entering
+        return a_entering
     
-    def get_basis_A(self):
-        return set(self.tableau_A.k_b)
+    def get_basis_M(self):
+        return set(self.tableau_M.k_b)
     
-    def get_basis_C(self):
-        return set(self.basis_C)
+    def get_basis_Phi(self):
+        return set(self.basis_Phi)
 
     def is_standard_form(self):
-        cond_1 = (np.diag(self.C_i_j)  == self.C_i_j.min(axis = 1) ).all() 
-        cond_2 = ((self.C_i_j[:,:self.nbi] + np.diag([np.inf] * self.nbi)).min(axis=1) >= self.C_i_j[:,self.nbi:].max(axis=1)).all()
+        cond_1 = (np.diag(self.Phi_z_a)  == self.Phi_z_a.min(axis = 1) ).all() 
+        cond_2 = ((self.Phi_z_a[:,:self.nbz] + np.diag([np.inf] * self.nbz)).min(axis=1) >= self.Phi_z_a[:,self.nbz:].max(axis=1)).all()
         return (cond_1 & cond_2)
     
         
-    def u_i(self,basis=None):
+    def p_z(self,basis=None):
         if basis is None:
-            basis = self.get_basis_C()
-        return self.C_i_j[:,list(basis)].min(axis = 1)    
+            basis = self.get_basis_Phi()
+        return self.Phi_z_a[:,list(basis)].min(axis = 1)    
     
-    def xsol_j(self,basis=None):
+    def musol_a(self,basis=None):
         if basis is None:
-            basis = self.get_basis_A()
-        B = self.A_i_j[:,list(basis)]
-        x_j = np.zeros(self.nbj)
-        x_j[list(basis)] = np.linalg.solve(B,self.d_i)
-        return x_j
+            basis = self.get_basis_M()
+        B = self.M_z_a[:,list(basis)]
+        mu_a = np.zeros(self.nba)
+        mu_a[list(basis)] = np.linalg.solve(B,self.q_z)
+        return mu_a
 
     
     def is_feasible_basis(self,basis):    
         try:
-            if self.xsol_j(list(basis) ).min()>=0:
+            if self.musol_a(list(basis) ).min()>=0:
                 return True
         except np.linalg.LinAlgError:
             pass
@@ -186,54 +187,53 @@ class TwoBases:
         
     def is_ordinal_basis(self,basis):
         res=False
-        if len(set(basis))==self.nbi:
-            res = (self.u_i(list(basis) )[:,None] >= self.C_i_j).any(axis = 0).all()
+        if len(set(basis))==self.nbz:
+            res = (self.p_z(list(basis) )[:,None] >= self.Phi_z_a).any(axis = 0).all()
         return res
     
     
-    def determine_entering(self,depcol):
+    def determine_entering(self,a_departing):
         self.nbstep += 1
-        ubefore_i = self.u_i(self.basis_C)
-        self.basis_C.remove(depcol)
-        uafter_i = self.u_i(self.basis_C)
-        i0 = np.where(ubefore_i < uafter_i)[0][0]
-        c0 = min([(c,self.C_i_j[i0,c]) for c in self.basis_C  ],key = lambda x: x[1])[0]
-        istar = [i for i in range(self.nbi) if uafter_i[i] == self.C_i_j[i,c0] and i != i0][0]
-        eligible_columns = [c for c in range(self.nbj) if min( [self.C_i_j[i,c] - uafter_i[i] for i in range(self.nbi) if i != istar]) >0 ]
-        entcol = max([(c,self.C_i_j[istar,c]) for c in eligible_columns], key = lambda x: x[1])[0]
-        self.basis_C.append(entcol)
-        return entcol
+        pbefore_z = self.p_z(self.basis_Phi)
+        self.basis_Phi.remove(a_departing)
+        pafter_z = self.p_z(self.basis_Phi)
+        i0 = np.where(pbefore_z < pafter_z)[0][0]
+        c0 = min([(c,self.Phi_z_a[i0,c]) for c in self.basis_Phi  ],key = lambda x: x[1])[0]
+        zstar = [z for z in range(self.nbz) if pafter_z[z] == self.Phi_z_a[z,c0] and z != i0][0]
+        eligible_columns = [c for c in range(self.nba) if min( [self.Phi_z_a[z,c] - pafter_z[z] for z in range(self.nbz) if z != zstar]) >0 ]
+        a_entering = max([(c,self.Phi_z_a[zstar,c]) for c in eligible_columns], key = lambda x: x[1])[0]
+        self.basis_Phi.append(a_entering)
+        return a_entering
         
         
     
-    def step(self,entcol ,verbose= 0):
-        depcol = self.tableau_A.determine_departing(entcol)
-        self.tableau_A.update(entcol,depcol)
+    def step(self,a_entering ,verbose= 0):
+        a_departing = self.tableau_M.determine_departing(a_entering)
+        self.tableau_M.update(a_entering,a_departing)
         
-        if self.get_basis_A() ==self.get_basis_C():
+        if self.get_basis_M() ==self.get_basis_Phi():
             if verbose>0:
-                print('Solution found in '+ str(self.nbstep)+' steps. Basis=',self.get_basis_C() )
+                print('Solution found in '+ str(self.nbstep)+' steps. Basis=',self.get_basis_Phi() )
             return False
             
-        new_entcol = self.determine_entering(depcol)
+        new_entcol = self.determine_entering(a_departing)
 
         if verbose>1:
             print('Step=', self.nbstep)
-            print('A basis = ' ,self.get_basis_A() )
-            print('C basis = ' ,self.get_basis_C() )
-            print('u_i=',self.u_i(list(self.get_basis_C()) ))
-            print('entering var (A)=',entcol)
-            print('departing var (A and C)=',depcol)
-            print('entering var (C)=',new_entcol)
+            print('M basis = ' ,self.get_basis_M() )
+            print('Phi basis = ' ,self.get_basis_Phi() )
+            print('p_z=',self.p_z(list(self.get_basis_Phi()) ))
+            print('entering var (M)=',a_entering)
+            print('departing var (M and Phi)=',a_departing)
+            print('entering var (Phi)=',new_entcol)
 
         return new_entcol
 
 
-    def solve(self,depcol = 0, verbose=0):
-        entcol = self.init_j_entering(depcol)
-        while entcol:
-            entcol = self.step(entcol,verbose)
-        return({'basis': self.get_basis_C(),
-                'x_j':self.xsol_j(),
-                'u_i':self.u_i()})
-
+    def solve(self,a_departing = 0, verbose=0):
+        a_entering = self.init_a_entering(a_departing)
+        while a_entering:
+            a_entering = self.step(a_entering,verbose)
+        return({'basis': self.get_basis_Phi(),
+                'mu_a':self.musol_a(),
+                'p_z':self.p_z()})
