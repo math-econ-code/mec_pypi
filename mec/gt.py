@@ -140,7 +140,7 @@ class TwoBases:
         self.Phi_z_a += np.arange(self.nba,0,-1)[None,:]* (self.Phi_z_a == self.M)
         self.q_z = self.q_z + np.arange(1,self.nbz+1)*self.eps
         # create an M and a Phi basis
-        self.tableau_M = Tableau( self.M_z_a[:,self.nbz:self.nba], q_z = self.q_z )
+        self.tableau_M = Tableau( self.M_z_a[:,self.nbz:self.nba], d_i = self.q_z )
         self.basis_Phi = list(range(self.nbz))
         ###
         
