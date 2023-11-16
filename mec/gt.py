@@ -125,8 +125,8 @@ from mec.lp import Tableau
 
 
 class TwoBases:
-    def __init__(self,Phi_M_pair,q_z=None,M=None,eps=1e-5):
-        self.Phi_z_a,self.M_z_a = Phi_M_pair
+    def __init__(self,Phi_z_a,M_z_a,q_z=None,M=None,eps=1e-5):
+        self.Phi_z_a,self.M_z_a = Phi_z_a,M_z_a
         if M is None:
             M = self.Phi_z_a.max()
         self.nbstep,self.M,self.eps = 1,M,eps
