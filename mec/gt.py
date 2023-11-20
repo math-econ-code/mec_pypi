@@ -125,7 +125,7 @@ from mec.lp import Tableau
 
 
 class TwoBases:
-    def __init__(self,Phi_z_a,M_z_a,q_z=None,M=None,eps=1e-5):
+    def __init__(self,Phi_z_a,M_z_a,q_z=None,remove_degeneracies=True,M=None,eps=1e-5):
         self.Phi_z_a,self.M_z_a = Phi_z_a,M_z_a
         if M is None:
             M = self.Phi_z_a.max()
@@ -137,8 +137,9 @@ class TwoBases:
             self.q_z = q_z
         
         # remove degeneracies:
-        self.Phi_z_a += np.arange(self.nba,0,-1)[None,:]* (self.Phi_z_a == self.M)
-        self.q_z = self.q_z + np.arange(1,self.nbz+1)*self.eps
+        if remove_degeneracies:
+            self.Phi_z_a += np.arange(self.nba,0,-1)[None,:]* (self.Phi_z_a == self.M)
+            self.q_z = self.q_z + np.arange(1,self.nbz+1)*self.eps
         # create an M and a Phi basis
         self.tableau_M = Tableau( self.M_z_a[:,self.nbz:self.nba], d_i = self.q_z )
         self.basis_Phi = list(range(self.nbz))
