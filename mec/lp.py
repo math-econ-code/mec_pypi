@@ -87,7 +87,7 @@ class Dictionary(LP):
     def __init__(self, A_i_j, d_i, c_j = None , slack_var_names_i=None,decision_var_names_j=None): 
         # s_i = d_i - A_i_j @ x_j
         LP.__init__(self,A_i_j, d_i, c_j,decision_var_names_j,slack_var_names_i)
-        self.nonbasic = [Symbol(x) for x in self.decision_var_names_j]
+        self.nonbasic = symbols(self.decision_var_names_j)
         self.base = { Symbol('obj') : c_j @ self.nonbasic }
         slack_exprs_i = d_i  - A_i_j @ self.nonbasic
         self.base.update({Symbol(name): slack_exprs_i[i] for (i,name) in enumerate(self.slack_var_names_i) })
@@ -103,7 +103,7 @@ class Dictionary(LP):
             
     def primal_solution(self, verbose=0):
         x_j = np.zeros(self.nbj)
-        for j,var in enumerate([Symbol(x) for x in self.decision_var_names_j]):
+        for j,var in enumerate(symbols(self.decision_var_names_j)):
             x_j[j]=float( self.base.get(var,sympy.Integer(0)).subs([(variable,0) for variable in self.nonbasic]) )
             if verbose > 0:
                 print(var, '=', x_j[j])
@@ -167,7 +167,7 @@ class Dictionary(LP):
         
     def simplex_loop(self,verbose = 0):
         if verbose >2:
-            [x1,x2] = [Symbol(x) for x in self.decision_var_names_j]
+            [x1,x2] = symbols(self.decision_var_names_j)
             the_path = [self.primal_solution()]
         finished = False
         while not finished:
