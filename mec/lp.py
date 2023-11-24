@@ -86,6 +86,9 @@ class LP():
 class Dictionary(LP):
     def __init__(self, A_i_j, d_i, c_j = None , slack_var_names_i=None,decision_var_names_j=None): 
         # s_i = d_i - A_i_j @ x_j
+        if d_i.min()<0:
+            from warnings import warn
+            warn('The array d_i has negative entries; zero is not a feasible solution.')
         LP.__init__(self,A_i_j, d_i, c_j,decision_var_names_j,slack_var_names_i)
         self.nonbasic = [Symbol(x) for x in self.decision_var_names_j]
         self.base = { Symbol('obj') : c_j @ self.nonbasic }
@@ -187,6 +190,9 @@ class Dictionary(LP):
 class Tableau(LP):
     def __init__(self, A_i_j, d_i, c_j = None,slack_var_names_i=None, decision_var_names_j = None): 
         # s_i = d_i - (A_i_j @ x_j
+        if d_i.min()<0:
+            from warnings import warn
+            warn('The array d_i has negative entries; zero is not a feasible solution.')
         LP.__init__(self, A_i_j, d_i, c_j, decision_var_names_j, slack_var_names_i)
         self.names_all_variables =  self.slack_var_names_i + self.decision_var_names_j
         self.tableau = np.block([[np.zeros((1,self.nbi)), self.c_j.reshape((1,-1)), 0],
@@ -301,3 +307,18 @@ class InteriorPoint():
         return True # finished
 
 
+def two_phase(A_i_j,d_i, verbose = False):
+    nbi,nbj = A_i_j.shape
+    signs_i = np.minimum(2*np.sign(d_i)+1,1) # 1 if >=0, -1 else
+    d_i = signs_i*d_i
+    A_i_j = signs_i[:,None] * A_i_j
+    the_tableau = Tableau(A_i_j, d_i, c_j = A_i_j.sum(axis= 0) )
+    the_tableau.simplex_solve()
+    if min(the_tableau.k_b >= nbi ):
+        if verbose:
+            print('Feasible.')
+        return [k-nbi for k in the_tableau.k_b ]
+    else:
+        if verbose:
+            print('Infeasible.')
+        return None
