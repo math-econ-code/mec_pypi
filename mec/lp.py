@@ -169,6 +169,9 @@ class Dictionary(LP):
         
         
     def simplex_loop(self,verbose = 0):
+        if self.d_i.min()<0:
+            from warnings import warn
+            warn('The array d_i has negative entries; zero is not a feasible solution.')
         if verbose >2:
             [x1,x2] = [Symbol(x) for x in self.decision_var_names_j]
             the_path = [self.primal_solution()]
@@ -190,9 +193,6 @@ class Dictionary(LP):
 class Tableau(LP):
     def __init__(self, A_i_j, d_i, c_j = None,slack_var_names_i=None, decision_var_names_j = None): 
         # s_i = d_i - (A_i_j @ x_j
-        if d_i.min()<0:
-            from warnings import warn
-            warn('The array d_i has negative entries; zero is not a feasible solution.')
         LP.__init__(self, A_i_j, d_i, c_j, decision_var_names_j, slack_var_names_i)
         self.names_all_variables =  self.slack_var_names_i + self.decision_var_names_j
         self.tableau = np.block([[np.zeros((1,self.nbi)), self.c_j.reshape((1,-1)), 0],
@@ -251,6 +251,9 @@ class Tableau(LP):
         return (kent is not None) # returns false  if optimal solution; true otherwise
 
     def simplex_solve(self,verbose=0):
+        if self.d_i.min()<0:
+            from warnings import warn
+            warn('The array d_i has negative entries; zero is not a feasible solution.')
         while self.simplex_step(verbose):
             pass
         return self.solution()
