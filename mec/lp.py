@@ -467,6 +467,7 @@ class Polyhedral():
             return self.j_b(j_n)[bdep]
         
     def star(self):
+        import networkx as nx
         the_graph = nx.DiGraph()
         j_n =  self.j_n.copy()
         xu = self.basic_solution_i(j_n)[:(self.nbk+1)]
