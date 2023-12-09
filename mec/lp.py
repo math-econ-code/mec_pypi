@@ -509,7 +509,7 @@ class Polyhedral():
         x_mk =  np.array(x_list)
         u_m = np.array(u_list)
 
-        ustar = Polyhedral_map(x_mk,u_m,xtilde_mk,utilde_m,namef=self.namef+'*',namev=chr(ord(self.namev)+1))
+        ustar = Polyhedral(x_mk,u_m,xtilde_mk,utilde_m,namef=self.namef+'*',namev=chr(ord(self.namev)+1))
 
         return (ustar)
 
