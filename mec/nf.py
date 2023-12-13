@@ -39,7 +39,7 @@ def create_connected_dag(num_nodes, num_edges, zero_node = 0, seed=777):
 
 
 class Network_problem:
-    def __init__(self,nodesList,arcsList,c_a,q_z , active_basis = None, zero_node = 0, pos=None,seed=777):
+    def __init__(self,nodesList,arcsList,c_a,q_z , active_basis = None, zero_node = 0, pos=None,seed=777, verbose=0):
         self.zero_node = zero_node
         self.nbz = len(nodesList)
         self.nba = len(arcsList)
@@ -48,7 +48,8 @@ class Network_problem:
         self.c_a = c_a
         self.nodesDict = {node:node_ind for (node_ind,node) in enumerate(self.nodesList)}
         self.arcsDict = {arc:arc_ind for (arc_ind,arc) in enumerate(self.arcsList)}
-        print('Number of nodes='+str(self.nbz)+'; number of arcs='+str(self.nba)+'.')
+        if verbose>1:
+            print('Number of nodes='+str(self.nbz)+'; number of arcs='+str(self.nba)+'.')
 
         data = np.concatenate([-np.ones(self.nba),np.ones(self.nba)])
         arcsIndices = list(range(self.nba))
@@ -113,7 +114,7 @@ class Network_problem:
                                edge_color='blue',) #connectionstyle='arc3,rad=0.3'
         
         labels = {z: f"q={self.q_z[i]:.0f}" for i,z in enumerate(self.nodesList) }
-        label_pos = {z: (position[0], position[1] - 0.15) for z, position in self.pos.items()}        
+        label_pos = {z: (position[0], position[1] - 0.03) for z, position in self.pos.items()}        
         if p_z is not None:
             p_z = np.concatenate([np.zeros(1),p_z])
             labels = {z: labels[z]+ f"\np={p_z[i]:.0f}" for i,z in enumerate(self.nodesList)} 
