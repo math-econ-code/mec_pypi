@@ -88,7 +88,7 @@ class Bimatrix_game:
         sjs = ['s_' + str(self.nbi+j+1) for j in range(self.nbj)]
         xis = ['x_' + str(i+1) for i in range(self.nbi)]
         #tab2 = Tableau(ris, yjs, self.A_i_j, np.ones(self.nbi) )
-        tab2 = Dictionary( self.A_i_j, np.ones(self.nbi),np.zeros(self.nbi),ris, yjs )
+        tab2 = Dictionary( self.A_i_j, np.ones(self.nbi),np.zeros(self.nbj),ris, yjs )
         #tab1 = Tableau(sjs, xis, self.B_i_j.T, np.ones(self.nbj) )
         tab1 = Dictionary(self.B_i_j.T, np.ones(self.nbj), np.zeros(self.nbi), sjs, xis)
         keys = ris+yjs+sjs+xis
