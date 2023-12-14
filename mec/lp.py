@@ -354,7 +354,7 @@ class Polyhedral():
         m = grb.Model()
         m.setParam('OutputFlag', 0)
         x_j = m.addMVar(self.nbj, lb = (self.nbk+1)*[-grb.GRB.INFINITY]+self.nbi*[0])
-        m.setObjective( - x_j[:self.nbk]@self.y_t_k[0,:] + x_j[self.nbk], sense = grb.GRB.MINIMIZE)
+        m.setObjective( x_j[:self.nbk]@(- self.y_t_k[0,:]) + x_j[self.nbk], sense = grb.GRB.MINIMIZE)
         m.addConstr(self.tableau_i_j @ x_j == self.rhs_i)
         m.optimize()
         self.j_n = [i for  (i,v) in enumerate(m.getVars() ) if v.vBasis == -1]
