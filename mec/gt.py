@@ -164,21 +164,25 @@ class Bimatrix_game:
         self.nbi,self.nbj = A_i_j.shape
 
     def mangasarian_stone_solve(self):
+        A_i_j = self.A_i_j - np.min(self.A_i_j) + 1     # adding constant to ensure that matrices are positive
+        B_i_j = self.B_i_j - np.min(self.B_i_j) + 1
         model=grb.Model()
         model.Params.OutputFlag = 0
         model.params.NonConvex = 2
-        p_i = model.addMVar(shape=self.nbi)
-        q_j = model.addMVar(shape=self.nbj)
-        alpha = model.addMVar(shape = 1)
-        beta = model.addMVar(shape = 1)
-        model.setObjective(alpha + beta  - p_i@(self.A_i_j+ self.B_i_j)@q_j ,sense = grb.GRB.MINIMIZE )
-        model.addConstr(self.A_i_j @ q_j - np.ones((self.nbi,1)) @  alpha <=  0 ) # 
-        model.addConstr(self.B_i_j.T @ p_i <= np.ones((self.nbj,1)) @  beta ) # @ 
+        p_i = model.addMVar(shape = self.nbi)
+        q_j = model.addMVar(shape = self.nbj)
+        α = model.addMVar(shape = 1)
+        β = model.addMVar(shape = 1)
+        model.setObjective(α + β - p_i @ (A_i_j + B_i_j) @ q_j, sense = grb.GRB.MINIMIZE)
+        model.addConstr(np.ones((self.nbi,1)) @ α - A_i_j @ q_j >= 0)
+        model.addConstr(np.ones((self.nbj,1)) @ β - B_i_j.T @ p_i >= 0)
         model.addConstr(p_i.sum() == 1)
         model.addConstr(q_j.sum() == 1)
-        model.optimize() 
-        thesol = np.array( model.getAttr('x'))
-        sol_dict = {'val1':thesol[-2], 'val2':thesol[-1], 'p_i':thesol[:self.nbi],'q_j':thesol[self.nbi:(self.nbi+self.nbj)]}    
+        model.optimize()
+        thesol = np.array(model.getAttr('x'))
+        sol_dict = {'val1':thesol[-2] + np.min(self.A_i_j) - 1,
+                    'val2':thesol[-1] + np.min(self.B_i_j) - 1,
+                    'p_i':thesol[:self.nbi],'q_j':thesol[self.nbi:(self.nbi+self.nbj)]}
         return(sol_dict)
         
     def lemke_howson_solve(self,verbose = 0):
