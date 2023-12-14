@@ -191,10 +191,10 @@ class Bimatrix_game:
         yjs = ['y_' + str(self.nbi+j+1) for j in range(self.nbj)]
         sjs = ['s_' + str(self.nbi+j+1) for j in range(self.nbj)]
         xis = ['x_' + str(i+1) for i in range(self.nbi)]
-        #tab2 = Tableau(ris, yjs, A_i_j, np.ones(self.nbi) )
-        tab2 = Dictionary(A_i_j, np.ones(self.nbi),np.zeros(self.nbj),ris, yjs )
-        #tab1 = Tableau(sjs, xis, B_i_j.T, np.ones(self.nbj) )
-        tab1 = Dictionary(B_i_j.T, np.ones(self.nbj), np.zeros(self.nbi), sjs, xis)
+        tab2 = Tableau(ris, yjs, A_i_j, np.ones(self.nbi) )
+        #tab2 = Dictionary(A_i_j, np.ones(self.nbi),np.zeros(self.nbj),ris, yjs )
+        tab1 = Tableau(sjs, xis, B_i_j.T, np.ones(self.nbj) )
+        #tab1 = Dictionary(B_i_j.T, np.ones(self.nbj), np.zeros(self.nbi), sjs, xis)
         keys = ris+yjs+sjs+xis
         labels = xis+sjs+yjs+ris
         complements = {Symbol(keys[t]): Symbol(labels[t]) for t in range(len(keys))}
