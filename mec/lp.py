@@ -330,25 +330,25 @@ def two_phase(A_i_j,d_i, verbose = False):
         
         
 class Polyhedral():
-    def __init__(self,y_tk,v_t,ytilde_sk= np.array([]),vtilde_s = np.array([]),namef = 'u',namev = 'x',verbose=0):
-        self.nbt,self.nbk= y_tk.shape
+    def __init__(self,y_t_k,v_t,ytilde_s_k= np.array([]),vtilde_s = np.array([]),namef = 'u',namev = 'x',verbose=0):
+        self.nbt,self.nbk= y_t_k.shape
         self.namef = namef
         self.namev = namev
-        if ytilde_sk.shape == (0,):
+        if ytilde_s_k.shape == (0,):
             self.nbs = 0 
-            ytilde_sk = ytilde_sk.reshape((0,self.nbk))
+            ytilde_s_k = ytilde_s_k.reshape((0,self.nbk))
         else:
-            self.nbs = ytilde_sk.shape[0]
+            self.nbs = ytilde_s_k.shape[0]
         self.nbi = self.nbt+self.nbs
         self.nbj = self.nbi+self.nbk+1
         if self.nbk > self.nbi:
             print('Caution: dimension larger than number of constraints.')
-        self.ytilde_sk = ytilde_sk
-        self.y_tk = y_tk
+        self.ytilde_s_k = ytilde_s_k
+        self.y_t_k = y_t_k
         self.vtilde_s = vtilde_s.reshape(self.nbs)
         self.v_t = v_t.reshape(self.nbt)
-        self.tableau_i_j = np.block([[self.y_tk, -np.ones((self.nbt,1)), np.eye(self.nbt),np.zeros( (self.nbt,self.nbs) ) ],
-                                   [self.ytilde_sk, -np.zeros((self.nbs,1)), np.zeros( (self.nbs,self.nbt) ), np.eye(self.nbs) ]])
+        self.tableau_i_j = np.block([[self.y_t_k, -np.ones((self.nbt,1)), np.eye(self.nbt),np.zeros( (self.nbt,self.nbs) ) ],
+                                   [self.ytilde_s_k, -np.zeros((self.nbs,1)), np.zeros( (self.nbs,self.nbt) ), np.eye(self.nbs) ]])
         self.rhs_i = np.concatenate([self.v_t,self.vtilde_s])
         j_n = list(range(self.nbk+1))
         m = grb.Model()
@@ -366,18 +366,18 @@ class Polyhedral():
         if np.array(x_k).shape ==():
             x_k = np.array([x_k])
         if self.nbs > 0:
-            if (self.ytilde_sk @ x_k - self.vtilde_s).max()>0:
+            if (self.ytilde_s_k @ x_k - self.vtilde_s).max()>0:
                 return float('inf')
-        return (self.y_tk @ x_k - self.v_t).max()
+        return (self.y_t_k @ x_k - self.v_t).max()
     
     def grad(self,x_k):
         if np.array(x_k).shape ==():
             x_k = np.array([x_k])
         if self.nbs > 0:
-            if (self.ytilde_sk @ x_k - self.vtilde_s).max()>0:
+            if (self.ytilde_s_k @ x_k - self.vtilde_s).max()>0:
                 return float('inf')
-        k = (self.y_tk @ x_k - self.v_t).argmax()
-        return self.y_tk[:,k]
+        k = (self.y_t_k @ x_k - self.v_t).argmax()
+        return self.y_t_k[:,k]
     
     def represent(self,num_digits = 2):
         from sympy import Symbol
@@ -387,10 +387,10 @@ class Polyhedral():
         else:
             x_k = [Symbol(self.namev+'_'+str(k)) for k in range(self.nbk)]
         if self.nbt >1:
-            obj = f'max{str({round_expr(e,num_digits) for e in list(self.y_tk @ x_k - self.v_t)} )}'
+            obj = f'max{str({round_expr(e,num_digits) for e in list(self.y_t_k @ x_k - self.v_t)} )}'
         else:
-            obj = str( (self.y_tk @ x_k - self.v_t)[0])
-        constrs = [f'{round_expr(self.ytilde_sk[s,:] @ x_k,num_digits)} <= {round(self.vtilde_s[s],num_digits)}' for s in range(self.nbs)]
+            obj = str( (self.y_t_k @ x_k - self.v_t)[0])
+        constrs = [f'{round_expr(self.ytilde_s_k[s,:] @ x_k,num_digits)} <= {round(self.vtilde_s[s],num_digits)}' for s in range(self.nbs)]
         print(obj)
         if self.nbk==1:
             print('for '+ self.namev+f' in {self.domain1d(num_digits)}')
@@ -402,15 +402,15 @@ class Polyhedral():
             print('for '+ self.namev+f' in R^{self.nbk}')
             
     def domain1d(self,num_digits = 2):
-        xl = max([float('-inf')]+[self.vtilde_s[s] / self.ytilde_sk[s] for s in range(self.nbs) if self.ytilde_sk[s]<0])
-        xu = min([float('inf')]+[self.vtilde_s[s] / self.ytilde_sk[s] for s in range(self.nbs) if self.ytilde_sk[s]>0])
+        xl = max([float('-inf')]+[self.vtilde_s[s] / self.ytilde_s_k[s] for s in range(self.nbs) if self.ytilde_s_k[s]<0])
+        xu = min([float('inf')]+[self.vtilde_s[s] / self.ytilde_s_k[s] for s in range(self.nbs) if self.ytilde_s_k[s]>0])
         return(round(float(xl),2), round(float(xu),2))
 
     def plot1d(self, xl=-10,xu=10,verbose = 0):
         if self.nbk >1:
             print('not 1d.')
-        xla = max([float('-inf')]+[self.vtilde_s[s] / self.ytilde_sk[s] for s in range(self.nbs) if self.ytilde_sk[s]<0])
-        xua = min([float('inf')]+[self.vtilde_s[s] / self.ytilde_sk[s] for s in range(self.nbs) if self.ytilde_sk[s]>0])
+        xla = max([float('-inf')]+[self.vtilde_s[s] / self.ytilde_s_k[s] for s in range(self.nbs) if self.ytilde_s_k[s]<0])
+        xua = min([float('inf')]+[self.vtilde_s[s] / self.ytilde_s_k[s] for s in range(self.nbs) if self.ytilde_s_k[s]>0])
         if verbose>0:
             print(f'Domain=({float(xla)},{float(xua)})')
         xl = max(xla,xl)
@@ -504,12 +504,12 @@ class Polyhedral():
             else:
                 x_list.append(the_dict[f][:-1])
                 u_list.append(the_dict[f][-1])
-        xtilde_mk = np.array(xtilde_list)
+        xtilde_m_k = np.array(xtilde_list)
         utilde_m = np.array(utilde_list)
-        x_mk =  np.array(x_list)
+        x_m_k =  np.array(x_list)
         u_m = np.array(u_list)
 
-        ustar = Polyhedral(x_mk,u_m,xtilde_mk,utilde_m,namef=self.namef+'*',namev=chr(ord(self.namev)+1))
+        ustar = Polyhedral(x_m_k,u_m,xtilde_m_k,utilde_m,namef=self.namef+'*',namev=chr(ord(self.namev)+1))
 
         return (ustar)
 
