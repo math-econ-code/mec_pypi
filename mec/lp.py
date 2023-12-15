@@ -209,7 +209,7 @@ class Tableau(LP):
         print(limited_tabulate(tableau, headers=[''] + self.names_all_variables + ['RHS'], tablefmt="grid"))
 
     def determine_entering(self):
-        for k in self.nbk:
+        for k in range(self.nbk):
             if self.tableau[0,k] > 0:
                 return k
         return None # If no entering variable found, None returned
