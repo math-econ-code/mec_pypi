@@ -30,11 +30,11 @@ def limited_tabulate(data, headers=None, tablefmt='grid', max_rows=18, max_cols=
 
 
 class LP():
-    def __init__(self,A_i_j,d_i,c_j = None,decision_var_names_j = None,slack_var_names_i = None):
+    def __init__(self, A_i_j, d_i, c_j = None, decision_var_names_j = None, slack_var_names_i = None):
         if c_j is None:
             c_j = np.zeros(A_i_j.shape[1])
         self.A_i_j = A_i_j
-        self.nbi , self.nbj = A_i_j.shape
+        self.nbi, self.nbj = A_i_j.shape
         self.nbk = self.nbi+self.nbj
         self.d_i = d_i
         self.c_j = c_j
@@ -189,48 +189,53 @@ class Dictionary(LP):
             self.plot2d(the_path, legend=False)
         return (self.primal_solution(),self.dual_solution(),objVal)
         
-        
-        
-        
+
 class Tableau(LP):
-    def __init__(self, A_i_j, d_i, c_j = None,slack_var_names_i=None, decision_var_names_j = None): 
-        # s_i = d_i - (A_i_j @ x_j
+    def __init__(self, A_i_j, d_i, c_j, slack_var_names_i = None, decision_var_names_j = None): # A_i_j @ x_j + s_i = d_i
         LP.__init__(self, A_i_j, d_i, c_j, decision_var_names_j, slack_var_names_i)
+        self.nbi,self.nbj = A_i_j.shape
+        self.nbk = self.nbi + self.nbj
         self.names_all_variables =  self.slack_var_names_i + self.decision_var_names_j
-        self.tableau = np.block([[np.zeros((1,self.nbi)), self.c_j.reshape((1,-1)), 0],
-                                 [np.eye(self.nbi),A_i_j,d_i.reshape((-1,1))]])
-        self.k_b = np.arange(self.nbi)   # columns associated with basic variables
-        self.i_b = np.arange(1,1+self.nbi) # rows associated with basic variables
+        self.tableau = np.block( [[np.zeros((1,self.nbi)), c_j.reshape((1,-1)), 0],
+                                  [np.eye(self.nbi), A_i_j, d_i.reshape((-1,1))]] )
+        self.k_b = list(range(self.nbi)) # columns associated with basic variables
+        self.i_b = list(range(1,1+self.nbi)) # rows associated with basic variables
 
     def display(self):
         tableau = []
-        tableau.append(['Obj'] + list(self.tableau[0,:])  )
+        tableau.append( ['Obj'] + list(self.tableau[0,:]) )
         for b in range(self.nbi):
              tableau.append([self.names_all_variables[self.k_b[b]]]+list(self.tableau[self.i_b[b],:]) )
-        
         print(limited_tabulate(tableau, headers=[''] + self.names_all_variables + ['RHS'], tablefmt="grid"))
-        
 
     def determine_entering(self):
-        for k in range(self.nbk):
+        for k in self.nbk:
             if self.tableau[0,k] > 0:
                 return k
         return None # If no entering variable found, None returned
 
-    def determine_departing(self,kent):
-        thedic = {self.k_b[b]: self.tableau[self.i_b[b],-1] / self.tableau[self.i_b[b],kent] 
+    def determine_departing(self, kent):
+        thedic = {self.k_b[b]: self.tableau[self.i_b[b],-1] / self.tableau[self.i_b[b],kent]
                   for b in range(self.nbi) if self.tableau[self.i_b[b],kent]>0}
         kdep = min(thedic, key = thedic.get)
         return kdep
 
-    def update(self,kent,kdep):
+    #def determine_departing(self, kent):
+    #    runmin, kdep = float('inf'), None
+    #    for b in range(self.nbi):
+    #        if self.tableau[self.i_b[b],kent] > 0:
+    #            ratio = self.tableau[self.i_b[b],-1] / self.tableau[self.i_b[b],kent]
+    #            if (ratio < runmin):
+    #                runmin, kdep = ratio, b
+    #    return kdep
+
+    def update(self, kent, kdep):
         bdep = int(np.where(self.k_b == kdep)[0]) 
         idep = self.i_b[bdep]
         self.tableau[idep,:] = self.tableau[idep,:] / self.tableau[idep,kent] 
         for i in range(1+self.nbi):
             if i != idep:
-                self.tableau[i,:]= self.tableau[i,:] - self.tableau[idep,:] * self.tableau[i,kent] 
-                
+                self.tableau[i,:]= self.tableau[i,:] - self.tableau[idep,:] * self.tableau[i,kent]
         self.k_b[bdep] = kent
         self.i_b[bdep] = idep
         
@@ -259,7 +264,6 @@ class Tableau(LP):
         while self.simplex_step(verbose):
             pass
         return self.solution()
-        
 
     def solution(self):
         x_j = np.zeros(self.nbj)
@@ -271,6 +275,7 @@ class Tableau(LP):
                 x_j[self.k_b[b]-self.nbi] = self.tableau[self.i_b[b],-1]
         y_i = - self.tableau[0,:self.nbi] 
         return(x_j,y_i,x_j@self.c_j)
+
 ##########################################
 ######### Interior Point Methods #########
 ##########################################
