@@ -40,7 +40,7 @@ def test_mec_lp_Tableau():
 ########################################################
 ########################################################
 ########################################################
-def test_mec_ot_OTProblem():
+def test_mec_ot_OTProblem(limited=False):
     from mec.ot import OTProblem
     [data_X,data_Y,A_k_l] =  mec.data.load_DupuyGalichon_data().values()
     sdX,sdY = data_X.std().values, data_Y.std().values
@@ -49,6 +49,8 @@ def test_mec_ot_OTProblem():
     nbx,nbk = feats_x_k.shape
     nby,nbl = feats_y_l.shape
     Φ_x_y = feats_x_k @ A_k_l @ feats_y_l.T
+    if limited:
+        Φ_x_y = Φ_x_y[0:10,0:10]
     marriageEx = OTProblem(Φ_x_y)
     (μ_x_y,u_x,v_y) = marriageEx.solve_full_lp()
     print('Man 0 matches with woman '+str(np.argwhere(μ_x_y[0,:] != 0)[0][0])+'.'  )
@@ -56,8 +58,10 @@ def test_mec_ot_OTProblem():
     print(μ_x_y.sum())
     u_x,v_y = marriageEx.solve_dual_partial_multiobj_lp(favor_Y=True)
     print(u_x.min(),v_y.min())
-
-    nbx,nby = 50,30
+    if limited:
+        nbx,nby = 10,8
+    else:
+        nbx,nby = 50,30
     marriage_ex = OTProblem(Φ_x_y[:nbx,:nby],np.ones(nbx) / nbx, np.ones(nby) / nby)
     nrow , ncol = min(8, nbx) , min(8, nby)
     marriage_ex.solve_full_lp()
@@ -129,8 +133,8 @@ def test_mec_lp():
     return
 
 
-def test_mec_ot():
-    test_mec_ot_OTProblem()
+def test_mec_ot(limited=False):
+    test_mec_ot_OTProblem(limited)
     test_mec_ot_TULogit()
     
     return
@@ -141,11 +145,11 @@ def test_mec_gt():
     
     return
 
-def test_mec():
+def test_mec(limited=False):
     print('Linear programming tests:\n'+'*'*30)
     test_mec_lp()
     print('*'*30+'\nOptimal transport tests:\n'+'*'*30)
-    test_mec_ot()
+    test_mec_ot(limited)
     print('*'*30+'\nGame theory tests:\n'+'*'*30)
     test_mec_gt()
     print('*'*30+'\n'+'*'*30+'\nAll tests completed successfully.')
