@@ -183,36 +183,36 @@ class Bimatrix_game:
                     'p_i': thesol[:self.nbi], 'q_j': thesol[self.nbi:(self.nbi+self.nbj)]}
         return(sol_dict)
 
-def lemke_howson_solve(self,verbose = 0):
-    A_i_j = self.A_i_j - np.min(self.A_i_j) + 1     # ensures that matrices are positive
-    B_i_j = self.B_i_j - np.min(self.B_i_j) + 1
-    zks = ['x_' + str(i+1) for i in range(self.nbi)] + ['y_' + str(j+1) for j in range(self.nbj)]
-    wks = ['r_' + str(i+1) for i in range(self.nbi)] + ['s_' + str(j+1) for j in range(self.nbj)]
-    complements = list(len(zks)+np.arange(len(zks))) + list(np.arange(len(zks)))
-    C_k_l = np.block([[np.zeros((self.nbi, self.nbi)), A_i_j],
-                      [B_i_j.T, np.zeros((self.nbj, self.nbj))]])
-    tab = Tableau(C_k_l, np.ones(self.nbi + self.nbj), np.zeros(self.nbi + self.nbj), wks, zks)
-    kent = len(wks) # z_1 enters
-    while True:
-        kdep = tab.determine_departing(kent)
-        if verbose > 1:
-            print('Basis: ', [(wks+zks)[i] for i in tab.k_b])
-            print((wks+zks)[kent], 'enters,', (wks+zks)[kdep], 'departs')
-        tab.update(kent, kdep)
-        if (complements[kent] not in tab.k_b) and (complements[kdep] in tab.k_b):
-            break
-        else:
-            kent = complements[kdep]
-    z_k, _, _ = tab.solution() # solution returns: x_j, y_i, x_j@self.c_j
-    x_i, y_j = z_k[:self.nbi], z_k[self.nbi:]
-    α = 1 / y_j.sum()
-    β = 1 /  x_i.sum()
-    p_i = x_i * α
-    q_j = y_j * β
-    sol_dict = {'val1': α + np.min(self.A_i_j) - 1,
-                'val2': β + np.min(self.B_i_j) - 1,
-                'p_i': p_i, 'q_j': q_j}
-    return(sol_dict)
+    def lemke_howson_solve(self,verbose = 0):
+        A_i_j = self.A_i_j - np.min(self.A_i_j) + 1     # ensures that matrices are positive
+        B_i_j = self.B_i_j - np.min(self.B_i_j) + 1
+        zks = ['x_' + str(i+1) for i in range(self.nbi)] + ['y_' + str(j+1) for j in range(self.nbj)]
+        wks = ['r_' + str(i+1) for i in range(self.nbi)] + ['s_' + str(j+1) for j in range(self.nbj)]
+        complements = list(len(zks)+np.arange(len(zks))) + list(np.arange(len(zks)))
+        C_k_l = np.block([[np.zeros((self.nbi, self.nbi)), A_i_j],
+                          [B_i_j.T, np.zeros((self.nbj, self.nbj))]])
+        tab = Tableau(C_k_l, np.ones(self.nbi + self.nbj), np.zeros(self.nbi + self.nbj), wks, zks)
+        kent = len(wks) # z_1 enters
+        while True:
+            kdep = tab.determine_departing(kent)
+            if verbose > 1:
+                print('Basis: ', [(wks+zks)[i] for i in tab.k_b])
+                print((wks+zks)[kent], 'enters,', (wks+zks)[kdep], 'departs')
+            tab.update(kent, kdep)
+            if (complements[kent] not in tab.k_b) and (complements[kdep] in tab.k_b):
+                break
+            else:
+                kent = complements[kdep]
+        z_k, _, _ = tab.solution() # solution returns: x_j, y_i, x_j@self.c_j
+        x_i, y_j = z_k[:self.nbi], z_k[self.nbi:]
+        α = 1 / y_j.sum()
+        β = 1 /  x_i.sum()
+        p_i = x_i * α
+        q_j = y_j * β
+        sol_dict = {'val1': α + np.min(self.A_i_j) - 1,
+                    'val2': β + np.min(self.B_i_j) - 1,
+                    'p_i': p_i, 'q_j': q_j}
+        return(sol_dict)
 
 
 class TwoBases:
