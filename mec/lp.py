@@ -22,7 +22,7 @@ def limited_tabulate(data, headers=None, tablefmt='grid', max_rows=18, max_cols=
         if headers:
             headers = headers[:max_cols]
         data = [row[:max_cols] for row in data]
-    
+
     return tb.tabulate(data, headers=headers, tablefmt=tablefmt)
 
 
@@ -44,7 +44,7 @@ class LP():
             slack_var_names_i = ['s_'+str(i) for i in range(self.nbi)]
         self.decision_var_names_j = decision_var_names_j
         self.slack_var_names_i = slack_var_names_i
-        
+
     def gurobi_solve(self,verbose=0):
         m = grb.Model()
         if verbose == 0:
@@ -54,8 +54,8 @@ class LP():
         constr_i = m.addConstr(self.A_i_j @ xg_j <= self.d_i)
         m.optimize()
         return(xg_j.x,constr_i.pi,m.objVal)
-        
-    
+
+
     def plot2d (self, the_path=[], legend=True):
         if len(self.c_j) != 2:
             print('The number of variables differs from two.')
@@ -86,7 +86,7 @@ class LP():
 
 
 class Dictionary(LP):
-    def __init__(self, A_i_j, d_i, c_j = None , slack_var_names_i=None,decision_var_names_j=None): 
+    def __init__(self, A_i_j, d_i, c_j = None , slack_var_names_i=None,decision_var_names_j=None):
         # s_i = d_i - A_i_j @ x_j
         if d_i.min()<0:
             from warnings import warn
@@ -104,8 +104,8 @@ class Dictionary(LP):
         print('-------------------------- \nObjective and constraints:')
         for var in self.base:
             print(var, '=', round_expr(self.base[var],2))
-            
-            
+
+
     def primal_solution(self, verbose=0):
         x_j = np.zeros(self.nbj)
         for j,var in enumerate([Symbol(x) for x in self.decision_var_names_j]):
@@ -113,14 +113,14 @@ class Dictionary(LP):
             if verbose > 0:
                 print(var, '=', x_j[j])
         return x_j
-    
+
     def determine_entering(self):
         self.nonbasic.sort(key=str) # Bland's rule
         for entering_var in self.nonbasic:
             if diff(self.base[Symbol('obj')],entering_var) > 0 :
                 return entering_var
         return None # If no entering variable found, None returned
-    
+
     def determine_departing(self,entering_var):
         runmin = float('inf')
         departing_var = None
@@ -132,7 +132,7 @@ class Dictionary(LP):
                 if (val_entering_var >= 0) & (val_entering_var < runmin) :
                     runmin,departing_var = val_entering_var, var
         return departing_var # if no variable is found, None returned
-        
+
     def pivot(self,entering_var,departing_var, verbose = 0):
         expr_entering = solve(self.base[departing_var] - departing_var,entering_var)[0]
         for var in self.base:
@@ -146,7 +146,7 @@ class Dictionary(LP):
         if verbose > 1:
             print(str( entering_var)+' = '+str(round_expr(expr_entering,2)))
         return expr_entering
-        
+
     def step(self,verbose=0):
         entering_var = self.determine_entering()
         if entering_var is None:
@@ -160,7 +160,7 @@ class Dictionary(LP):
                 expr_entering_var = self.pivot(entering_var,departing_var, verbose)
                 return False # not finished
         return True # finished
-        
+
     def dual_solution(self,verbose = 0):
         y_i = np.zeros(self.nbi)
         for i,slackvar in enumerate(self.slack_var_names_i):
@@ -168,8 +168,8 @@ class Dictionary(LP):
             if verbose > 0 and y_i[i] != 0:
                 print('pi_'+str(i)+'=', y_i[i])
         return y_i
-        
-        
+
+
     def simplex_loop(self,verbose = 0):
         if self.d_i.min()<0:
             from warnings import warn
@@ -188,7 +188,7 @@ class Dictionary(LP):
         if verbose >2:
             self.plot2d(the_path, legend=False)
         return (self.primal_solution(),self.dual_solution(),objVal)
-        
+
 
 class Tableau(LP):
     def __init__(self, A_i_j, d_i, c_j, slack_var_names_i = None, decision_var_names_j = None): # A_i_j @ x_j + s_i = d_i
@@ -205,7 +205,7 @@ class Tableau(LP):
         tableau = []
         tableau.append( ['Obj'] + list(self.tableau[0,:]) )
         for b in range(self.nbi):
-             tableau.append([self.names_all_variables[self.k_b[b]]]+list(self.tableau[self.i_b[b],:]) )
+            tableau.append([self.names_all_variables[self.k_b[b]]]+list(self.tableau[self.i_b[b],:]) )
         print(limited_tabulate(tableau, headers=[''] + self.names_all_variables + ['RHS'], tablefmt="grid"))
 
     def determine_entering(self):
@@ -214,31 +214,31 @@ class Tableau(LP):
                 return k
         return None # If no entering variable found, None returned
 
-    def determine_departing(self, kent):
-        thedic = {self.k_b[b]: self.tableau[self.i_b[b],-1] / self.tableau[self.i_b[b],kent]
-                  for b in range(self.nbi) if self.tableau[self.i_b[b],kent]>0}
-        kdep = min(thedic, key = thedic.get)
-        return kdep
-
-    #def determine_departing(self, kent):
-    #    runmin, kdep = float('inf'), None
-    #    for b in range(self.nbi):
-    #        if self.tableau[self.i_b[b],kent] > 0:
-    #            ratio = self.tableau[self.i_b[b],-1] / self.tableau[self.i_b[b],kent]
-    #            if (ratio < runmin):
-    #                runmin, kdep = ratio, b
+    #def determine_departing(self, kent): # Alfred
+    #    thedic = {self.k_b[b]: self.tableau[self.i_b[b],-1] / self.tableau[self.i_b[b],kent]
+    #              for b in range(self.nbi) if self.tableau[self.i_b[b],kent]>0}
+    #    kdep = min(thedic, key = thedic.get)
     #    return kdep
 
+    def determine_departing(self, kent):
+        runmin, kdep = float('inf'), None
+        for b in range(self.nbi):
+            if self.tableau[self.i_b[b],kent] > 0:
+                ratio = self.tableau[self.i_b[b],-1] / self.tableau[self.i_b[b],kent]
+                if (ratio < runmin):
+                    runmin, kdep = ratio, self.k_b[b]
+        return kdep
+
     def update(self, kent, kdep):
-        bdep = int(np.where(self.k_b == kdep)[0]) 
+        bdep = self.k_b.index(kdep)
         idep = self.i_b[bdep]
-        self.tableau[idep,:] = self.tableau[idep,:] / self.tableau[idep,kent] 
+        self.tableau[idep,:] = self.tableau[idep,:] / self.tableau[idep,kent]
         for i in range(1+self.nbi):
             if i != idep:
                 self.tableau[i,:]= self.tableau[i,:] - self.tableau[idep,:] * self.tableau[i,kent]
         self.k_b[bdep] = kent
         self.i_b[bdep] = idep
-        
+
     def simplex_step(self,verbose=0):
         if verbose>1:
             self.display()
@@ -246,8 +246,7 @@ class Tableau(LP):
         if kent is not None:
             kdep= self.determine_departing(kent)
             if verbose>0:
-                
-                bdep = int(np.where(self.k_b == kdep)[0])  
+                bdep = int(np.where(self.k_b == kdep)[0])
                 print('Entering=', self.names_all_variables[kent], 'Departing=',self.names_all_variables[self.i_b[bdep]],'Pivot=',(self.i_b[bdep],kent))
             self.update(kent,kdep)
         else:
@@ -273,8 +272,8 @@ class Tableau(LP):
                 s_i[self.k_b[b]] = self.tableau[self.i_b[b],-1]
             else:
                 x_j[self.k_b[b]-self.nbi] = self.tableau[self.i_b[b],-1]
-        y_i = - self.tableau[0,:self.nbi] 
-        return(x_j,y_i,x_j@self.c_j)
+        y_i = - self.tableau[0,:self.nbi]
+        return x_j, y_i, x_j@self.c_j
 
 ##########################################
 ######### Interior Point Methods #########
@@ -286,15 +285,15 @@ class InteriorPoint():
         self.current_point = current_point
         self.α = 1 - (1/8)/(1/5 + np.sqrt(len(self.c))) # shrinkage coeff from Freund & Vera
 
-#    def strictly_feasible_solution(self):
-#        x = np.linalg.lstsq(self.A, self.b) # Ax < b
-#        s = .01*np.ones(len(self.c))
-#        y = np.linalg.lstsq(self.A.T, s + self.c) # A.T y > c
-#        return np.concatenate((x,y,s))
+    #    def strictly_feasible_solution(self):
+    #        x = np.linalg.lstsq(self.A, self.b) # Ax < b
+    #        s = .01*np.ones(len(self.c))
+    #        y = np.linalg.lstsq(self.A.T, s + self.c) # A.T y > c
+    #        return np.concatenate((x,y,s))
 
     def plot_path(self, the_path, legend=True):
         plot_path(self.A, self.b, self.c, the_path, legend)
-    
+
     def update(self, verbose=0):
         x, y, s, θ = self.current_point
         Δy = np.linalg.solve(self.A @ np.diag(1/s) @ np.diag(x) @ self.A.T, θ * self.A @ (1/s) - self.b)
@@ -302,7 +301,7 @@ class InteriorPoint():
         Δx = - x - np.diag(1/s) @ np.diag(x) @ Δs + θ * (1/s)
         self.current_point = [x+Δx, y+Δy, s+Δs, self.α*θ]
         return self.current_point
-    
+
     def IP_loop(self, tol=1e-6, verbose=0):
         current_point = self.current_point
         new_point = self.update()
@@ -332,15 +331,15 @@ def two_phase(A_i_j,d_i, verbose = False):
         if verbose:
             print('Infeasible.')
         return None
-        
-        
+
+
 class Polyhedral():
     def __init__(self,y_t_k,v_t,ytilde_s_k= np.array([]),vtilde_s = np.array([]),namef = 'u',namev = 'x',verbose=0):
         self.nbt,self.nbk= y_t_k.shape
         self.namef = namef
         self.namev = namev
         if ytilde_s_k.shape == (0,):
-            self.nbs = 0 
+            self.nbs = 0
             ytilde_s_k = ytilde_s_k.reshape((0,self.nbk))
         else:
             self.nbs = ytilde_s_k.shape[0]
@@ -353,7 +352,7 @@ class Polyhedral():
         self.vtilde_s = vtilde_s.reshape(self.nbs)
         self.v_t = v_t.reshape(self.nbt)
         self.tableau_i_j = np.block([[self.y_t_k, -np.ones((self.nbt,1)), np.eye(self.nbt),np.zeros( (self.nbt,self.nbs) ) ],
-                                   [self.ytilde_s_k, -np.zeros((self.nbs,1)), np.zeros( (self.nbs,self.nbt) ), np.eye(self.nbs) ]])
+                                     [self.ytilde_s_k, -np.zeros((self.nbs,1)), np.zeros( (self.nbs,self.nbt) ), np.eye(self.nbs) ]])
         self.rhs_i = np.concatenate([self.v_t,self.vtilde_s])
         j_n = list(range(self.nbk+1))
         m = grb.Model()
@@ -365,8 +364,8 @@ class Polyhedral():
         self.j_n = [i for  (i,v) in enumerate(m.getVars() ) if v.vBasis == -1]
         if verbose>0:
             print('Initial nonbasic columns=',self.j_n)
-        
-        
+
+
     def val(self,x_k):
         if np.array(x_k).shape ==():
             x_k = np.array([x_k])
@@ -374,7 +373,7 @@ class Polyhedral():
             if (self.ytilde_s_k @ x_k - self.vtilde_s).max()>0:
                 return float('inf')
         return (self.y_t_k @ x_k - self.v_t).max()
-    
+
     def grad(self,x_k):
         if np.array(x_k).shape ==():
             x_k = np.array([x_k])
@@ -383,7 +382,7 @@ class Polyhedral():
                 return float('inf')
         k = (self.y_t_k @ x_k - self.v_t).argmax()
         return self.y_t_k[:,k]
-    
+
     def represent(self,num_digits = 2):
         from sympy import Symbol
         from mec.lp import round_expr
@@ -405,7 +404,7 @@ class Polyhedral():
                 print(c)
         else:
             print('for '+ self.namev+f' in R^{self.nbk}')
-            
+
     def domain1d(self,num_digits = 2):
         xl = max([float('-inf')]+[self.vtilde_s[s] / self.ytilde_s_k[s] for s in range(self.nbs) if self.ytilde_s_k[s]<0])
         xu = min([float('inf')]+[self.vtilde_s[s] / self.ytilde_s_k[s] for s in range(self.nbs) if self.ytilde_s_k[s]>0])
@@ -421,23 +420,23 @@ class Polyhedral():
         xl = max(xla,xl)
         xu = min(xua,xu)
         xs = np.linspace(xl, xu, 400)
-        ys = [self.val(x) for x in xs]    
+        ys = [self.val(x) for x in xs]
         plt.plot(xs, ys, label=self.namef+f'({self.namev})')
         plt.xlabel(self.namev)
         plt.ylabel(self.namef)
         plt.legend()
         plt.show()
 
-    
+
     def j_b(self,j_n = None):
         if j_n is None:
             j_n = self.j_n
         return [j for j in range(self.nbj) if j not in j_n]
-    
-    
+
+
     def subtableau_i_b(self,j_n=None):
         return self.tableau_i_j[:,self.j_b(j_n) ]
-    
+
     def subtableau_i_n(self, j_n=None):
         if j_n is None:
             j_n = self.j_n
@@ -445,24 +444,24 @@ class Polyhedral():
 
     def basic_solution_i(self, j_n):
         return np.linalg.solve(self.subtableau_i_b(j_n),self.rhs_i)
-        
+
     def basic_infinite_solution_i(self,j_n,jent):
         ient = jent - self.nbk - 1
         therhs_i = np.zeros(self.nbi)
         therhs_i[ient] = -1
-        return np.linalg.solve(self.subtableau_i_b(j_n),therhs_i) 
-        
-        
+        return np.linalg.solve(self.subtableau_i_b(j_n),therhs_i)
+
+
     def dictionary(self,j_n=None): # of the form x_b = sol_b - D_b_n @ x_n
-        sol_b = np.linalg.solve(self.subtableau_i_b(j_n),self.rhs_i) 
-        D_b_n = np.linalg.solve(self.subtableau_i_b(j_n),self.subtableau_i_n(j_n)) 
+        sol_b = np.linalg.solve(self.subtableau_i_b(j_n),self.rhs_i)
+        D_b_n = np.linalg.solve(self.subtableau_i_b(j_n),self.subtableau_i_n(j_n))
         return (sol_b,D_b_n)
-    
+
     def determine_departing(self,j_n,jent):
         nent = [n for (n,j) in enumerate(j_n) if j==jent][0]
         (sol_b,D_b_n) = self.dictionary(j_n)
         D_b = D_b_n[:,nent]
-        thedic = {b: sol_b[b] / D_b[b] 
+        thedic = {b: sol_b[b] / D_b[b]
                   for b in range(self.nbk+1,self.nbi) # the nbk+1 first basic variables are the x_k and u and are unconstrained 
                   if  D_b[b] >0}
         if len (thedic)==0:
@@ -470,7 +469,7 @@ class Polyhedral():
         else:
             bdep = min(thedic, key = thedic.get)
             return self.j_b(j_n)[bdep]
-        
+
     def star(self):
         import networkx as nx
         the_graph = nx.DiGraph()
@@ -478,7 +477,7 @@ class Polyhedral():
         xu = self.basic_solution_i(j_n)[:(self.nbk+1)]
         the_dict = {frozenset(j_n): xu }
         labels_to_add = [j_n]
-        the_graph.add_nodes_from([frozenset(j_n)] )       
+        the_graph.add_nodes_from([frozenset(j_n)] )
         while len(labels_to_add)>0:
             j_n = labels_to_add.pop()
             for jent in j_n:
@@ -496,7 +495,7 @@ class Polyhedral():
                     xu = self.basic_infinite_solution_i(j_n,jent)[:(self.nbk+1)] # find info 
                     the_dict.update({frozenset(jnext_n): xu }) # add to the dictionary
 
-        xtilde_list = [] 
+        xtilde_list = []
         utilde_list = []
         x_list = []
         u_list = []
@@ -519,9 +518,9 @@ class Polyhedral():
         return (ustar)
 
     # def plot2d
-    
+
     # def sum
-    
+
     # def infimum_convolution
-    
+
     # def relational_graph
