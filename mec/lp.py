@@ -579,8 +579,12 @@ def polyhedral_from_strings(expr_fun_str ,expr_dom_strs = [], verbose= 0):
 
     # def plot2d
 
-
-
     # def infimum_convolution
 
     # def relational_graph
+    
+    # soft max regularization
+
+    # Hessian and possibly higher order derivatives
+    
+    # power diagrams 
