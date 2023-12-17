@@ -332,12 +332,19 @@ def two_phase(A_i_j,d_i, verbose = False):
             print('Infeasible.')
         return None
 
-
 class Polyhedral():
-    def __init__(self,y_t_k,v_t,ytilde_s_k= np.array([]),vtilde_s = np.array([]),namef = 'u',namev = 'x',verbose=0):
+    def __init__(self,y_t_k,v_t,ytilde_s_k= np.array([]),vtilde_s = np.array([]),namef = 'u',namesv = 'x',verbose=0):
         self.nbt,self.nbk= y_t_k.shape
         self.namef = namef
-        self.namev = namev
+        if type(namesv)==str:
+            if self.nbk==1:
+                self.namesv = [namesv[0]] 
+            else:
+                self.namesv = [namesv[0]+'_'+str(k) for k in range(self.nbk)] 
+        elif (type(namesv)==list) & (len(namesv)==self.nbk):
+            self.namesv = namesv
+        else:
+            raise Exception("Parameter namesv not provided under the right format.")
         if ytilde_s_k.shape == (0,):
             self.nbs = 0
             ytilde_s_k = ytilde_s_k.reshape((0,self.nbk))
@@ -386,10 +393,7 @@ class Polyhedral():
     def represent(self,num_digits = 2):
         from sympy import Symbol
         from mec.lp import round_expr
-        if self.nbk==1:
-            x_k = [Symbol(self.namev)]
-        else:
-            x_k = [Symbol(self.namev+'_'+str(k)) for k in range(self.nbk)]
+        x_k = [Symbol(namev) for namev in self.namesv]
         if self.nbt >1:
             obj = f'max{str({round_expr(e,num_digits) for e in list(self.y_t_k @ x_k - self.v_t)} )}'
         else:
@@ -397,13 +401,13 @@ class Polyhedral():
         constrs = [f'{round_expr(self.ytilde_s_k[s,:] @ x_k,num_digits)} <= {round(self.vtilde_s[s],num_digits)}' for s in range(self.nbs)]
         print(obj)
         if self.nbk==1:
-            print('for '+ self.namev+f' in {self.domain1d(num_digits)}')
+            print('for '+ self.namesv[0]+f' in {self.domain1d(num_digits)}')
         elif self.nbs>0:
-            print('for '+ self.namev+' s.t.')
+            print('for '+ str(self.namesv)+' s.t.')
             for c in constrs:
                 print(c)
         else:
-            print('for '+ self.namev+f' in R^{self.nbk}')
+            print('for '+ str(self.namesv)+f' in R^{self.nbk}')
 
     def domain1d(self,num_digits = 2):
         xl = max([float('-inf')]+[self.vtilde_s[s] / self.ytilde_s_k[s] for s in range(self.nbs) if self.ytilde_s_k[s]<0])
@@ -421,8 +425,8 @@ class Polyhedral():
         xu = min(xua,xu)
         xs = np.linspace(xl, xu, 400)
         ys = [self.val(x) for x in xs]
-        plt.plot(xs, ys, label=self.namef+f'({self.namev})')
-        plt.xlabel(self.namev)
+        plt.plot(xs, ys, label=self.namef+f'({self.namesv[0]})')
+        plt.xlabel(self.namesv[0])
         plt.ylabel(self.namef)
         plt.legend()
         plt.show()
@@ -512,14 +516,70 @@ class Polyhedral():
         utilde_m = np.array(utilde_list)
         x_m_k =  np.array(x_list)
         u_m = np.array(u_list)
-
-        ustar = Polyhedral(x_m_k,u_m,xtilde_m_k,utilde_m,namef=self.namef+'*',namev=chr(ord(self.namev)+1))
+        
+        names_dual_var = [ (chr(ord(name[0])+1)+name[1:]) for name in self.namesv]
+        print(names_dual_var)
+        ustar = Polyhedral(x_m_k,u_m,xtilde_m_k,utilde_m,namef=self.namef+'*',namesv=names_dual_var )
 
         return (ustar)
+        
+        
+    def sum(self,u2):
+        u1 = self
+        if u1.nbk == u2.nbk:
+            nbk = u1.nbk
+        else:
+            print('Dimensions do not match.')
+        y_t1t2_k = (u1.y_t_k[:,None,:] + u2.y_t_k[None,:,:]).reshape((-1,nbk))
+        v_t1t2 = (u1.y_t_k[:,None] + u2.y_t_k[None,:]).flatten()
+        ytilde_s_k = np.block([[u1.ytilde_s_k],[u2.ytilde_s_k]])
+        vtilde_s = np.concatenate([u1.vtilde_s,u2.vtilde_s])
+        usum = Polyhedral(y_t1t2_k, v_t1t2,ytilde_s_k,vtilde_s )
+        return(usum)
+
+
+def polyhedral_from_strings(expr_fun_str ,expr_dom_strs = [], verbose= 0):
+    # for example exammple: 
+    # expr_fun_str = 'max(3*a+2*b-1, 4*a-b+3,7*a-3*b+9)'
+    # expr_dom_strs = ['a+1 <= 0 ','b >= 1']
+    expr_fun = sympify(expr_fun_str)
+    expr_doms = [sympify(expr_dom_str) for expr_dom_str in expr_dom_strs]
+    variables = sorted(expr_fun.free_symbols.union(*[expr_dom.free_symbols for expr_dom in expr_doms] ), key=lambda x: x.name)
+    if verbose:
+        print('Variables =' , variables)
+    list_y = []
+    list_v = []
+    for expr in expr_fun.args:
+        coeffs = expr.as_coefficients_dict() 
+        list_y.append([coeffs.get(v,0) for v in variables] )
+        list_v.append(-coeffs.get(1,0))
+    y_t_k = np.array(list_y)
+    v_t = np.array(list_v)
+    if len(expr_dom_strs) == 0:
+        return Polyhedral(y_t_k,v_t) 
+
+    list_ytilde = []
+    list_vtilde = []
+
+    for expr in expr_doms:
+        lhs, rhs = expr.args
+        if (expr.func == sympy.core.relational.LessThan) or (expr.func == sympy.core.relational.StrictLessThan):
+            diff = lhs - rhs
+        elif (expr.func == sympy.core.relational.GreaterThan) or (expr.func == sympy.core.relational.StrictGreaterThan):
+            diff = rhs - lhs
+        else:
+            print('Not expected format.')
+        coeffs = diff.as_coefficients_dict()
+        list_ytilde.append([coeffs.get(v,0) for v in variables] )
+        list_vtilde.append(-coeffs.get(1,0))
+    ytilde_s_k = np.array(list_ytilde)
+    vtilde_s = np.array(list_vtilde)
+    return Polyhedral(y_t_k,v_t,ytilde_s_k,vtilde_s,namesv = [str(var) for var in variables] )
+
 
     # def plot2d
 
-    # def sum
+
 
     # def infimum_convolution
 
