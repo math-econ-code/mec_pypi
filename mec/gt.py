@@ -207,8 +207,8 @@ class Bimatrix_game:
         x_i, y_j = z_k[:self.nbi], z_k[self.nbi:]
         α = 1 / y_j.sum()
         β = 1 /  x_i.sum()
-        p_i = x_i * α
-        q_j = y_j * β
+        p_i = x_i * β
+        q_j = y_j * α
         sol_dict = {'val1': α + np.min(self.A_i_j) - 1,
                     'val2': β + np.min(self.B_i_j) - 1,
                     'p_i': p_i, 'q_j': q_j}
