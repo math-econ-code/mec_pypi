@@ -38,6 +38,31 @@ def create_connected_dag(num_nodes, num_edges, zero_node = 0, seed=777):
     return (node_list,arcs_list,c_a,q_z,G)
 
 
+
+def create_connected_bipartite(nbx, nby,  zero_node = 0, seed=777):
+    num_nodes = nbx + nby
+    num_edges = nbx * nby
+    np.random.seed(seed)
+    cont = True
+    G = nx.DiGraph()
+    G.add_nodes_from(['x'+str(i) for i in range(nbx)] ,bipartite= 0)
+    G.add_nodes_from([ 'y'+str(j) for j in range(nby)] ,bipartite= 1)
+    G.add_edges_from([('x'+str(i),'y'+str(j)) for j in range(nby)  for i in range(nbx)] )
+
+    
+    node_list = list(G.nodes)
+    arcs_list = list(G.edges)
+    basis = list(np.random.choice(list( range(num_edges)), num_nodes-1 ) )
+    mu_a = np.zeros(num_edges)
+    mu_a[basis] = np.random.randint(0, num_edges, num_nodes - 1 )+1
+    c_a = np.random.randint(0, num_edges, num_edges)+1
+
+    q_z = np.array(nx.incidence_matrix(G, oriented=True).todense() @ mu_a)
+    #if q_z[0] <0:
+    #    cont= False
+    return (node_list,arcs_list,c_a,q_z,G)
+
+
 class Network_problem:
     def __init__(self,nodesList,arcsList,c_a,q_z , active_basis = None, zero_node = 0, pos=None,seed=777, verbose=0):
         self.zero_node = zero_node
@@ -104,22 +129,22 @@ class Network_problem:
         nx.draw_networkx_edge_labels(self.digraph,self.pos,
                                     edge_labels=edge_labels,
                                     font_color='red')
-        
+                                    
         nx.draw(self.digraph,self.pos,
                 edgelist=[self.arcsList[i] for i  in range(self.nba) if i not in self.basis() ],
                 style='dotted', 
-                with_labels=True)
+                with_labels=False)
                                               
         nx.draw_networkx_edges(self.digraph, self.pos, edgelist=[self.arcsList[i] for i in self.basis()], 
-                               edge_color='blue',) #connectionstyle='arc3,rad=0.3'
+                               edge_color='blue') #connectionstyle='arc3,rad=0.3'
         
-        labels = {z: f"q={self.q_z[i]:.0f}" for i,z in enumerate(self.nodesList) }
-        label_pos = {z: (position[0], position[1] - 0.03) for z, position in self.pos.items()}        
+        labels = {z: f"q={self.q_z[i]:.0f}"+'\n'+z for i,z in enumerate(self.nodesList) }
+        label_pos = {z: (position[0], position[1] ) for z, position in self.pos.items()}        
         if p_z is not None:
             p_z = np.concatenate([np.zeros(1),p_z])
             labels = {z: labels[z]+ f"\np={p_z[i]:.0f}" for i,z in enumerate(self.nodesList)} 
         
-        nx.draw_networkx_labels(self.digraph, label_pos, labels,font_size=8)
+        nx.draw_networkx_labels(self.digraph, label_pos, labels,font_size=10,verticalalignment = 'center')
             
         if entering_a is not None:
             nx.draw_networkx_edges(self.digraph, self.pos, edgelist=[self.arcsList[entering_a]], 
