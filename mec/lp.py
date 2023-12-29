@@ -329,7 +329,7 @@ def two_phase(A_i_j,d_i, verbose = False):
     A_i_j = signs_i[:,None] * A_i_j
     the_tableau = Tableau(A_i_j, d_i, c_j = A_i_j.sum(axis= 0) )
     the_tableau.simplex_solve()
-    if min(the_tableau.k_b >= nbi ):
+    if (min(the_tableau.k_b) >= nbi ):
         if verbose:
             print('Feasible.')
         return [k-nbi for k in the_tableau.k_b ]
