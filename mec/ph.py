@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 
 class Polyhedral():
-    def __init__(self,y_t_k,v_t,ytilde_s_k= np.array([]),vtilde_s = np.array([]),namef = 'u',namesv = None,verbose=0):
+    def __init__(self,y_t_k,v_t,ytilde_s_k= np.array([]),vtilde_s = np.array([]),namef = '',namesv = None,verbose=0):
         if namesv is None:
             namesv = 'x'
         self.nbt,self.nbk= y_t_k.shape
@@ -69,7 +69,7 @@ class Polyhedral():
         k = (self.y_t_k @ x_k - self.v_t).argmax()
         return self.y_t_k[:,k]
 
-    def __repr__(self,num_digits = 2):
+    def __repr__(self,num_digits = 2,with_name = True):
         if self.all_infinite == 1:
             return '+ infinity everywhere' 
         elif self.all_infinite == -1:
@@ -83,16 +83,25 @@ class Polyhedral():
             else:
                 obj = str( (self.y_t_k @ x_k - self.v_t)[0])
             constrs = [f'{round_expr(self.ytilde_s_k[s,:] @ x_k,num_digits)} <= {round(self.vtilde_s[s],num_digits)}' for s in range(self.nbs)]
-            result = str(obj)
-            if self.nbk==1:
-                result += '\n'+ ('for '+ self.namesv[0]+f' in {self.domain1d(num_digits)}')
-            elif self.nbs>0:
-                result += '\n'+ str('for '+ str(self.namesv)+' s.t.')
-                for c in constrs:
-                    result += '\n'+ str(c)
+            vars_str = ''.join([ name+ (',' if i<self.nbk-1 else '') for (i,name) in enumerate(self.namesv) ])
+            vars_str_with_parenthesis = ('(' if self.nbk>1 else '') + vars_str + (')' if self.nbk>1 else '') 
+            if with_name:
+                if self.namef == '':
+                    result = 'Function: '
+                else:
+                    result = self.namef + '(' + vars_str + ')' 
             else:
-                result += '\n'+ str('for '+ str(self.namesv)+f' in R^{self.nbk}')
-            return result+'\n'
+                result = ''
+            result += str(obj)
+            if (self.nbk==1) and (self.nbs>0):
+                result += '\n'+ ('Domain: '+ self.namesv[0]+f' in {self.domain1d(num_digits)}')
+            elif (self.nbk>1) and (self.nbs>0):
+                result += '\n'+ 'Domain: ' + vars_str_with_parenthesis +' s.t. ' +('\n' if self.nbs>1 else '')
+                for c in constrs:
+                    result +=  str(c)+ '\n'
+            else: # if there are no constraints
+                result += '\n'+ str('Domain: ' + vars_str_with_parenthesis + ' in R' + ('^'+str(self.nbk) if self.nbk>1 else '') +'.\n')
+            return result
 
     def domain1d(self,num_digits = 2):
         xl = max([float('-inf')]+[self.vtilde_s[s] / self.ytilde_s_k[s] for s in range(self.nbs) if self.ytilde_s_k[s]<0])
@@ -159,9 +168,9 @@ class Polyhedral():
             bdep = min(thedic, key = thedic.get)
             return self.j_b(j_n)[bdep]
 
-    def star(self, names_dual_var = None):
+    def star(self, namesv = None):
         if self.all_infinite != 0:
-            v = Polyhedral(np.zeros( (1,self.nbk) ) ,np.zeros(1),namesv = names_dual_var )
+            v = Polyhedral(np.zeros( (1,self.nbk) ) ,np.zeros(1),namesv = namesv )
             v.all_infinite = - self.all_infinite 
             return v
         import networkx as nx
@@ -206,9 +215,10 @@ class Polyhedral():
         x_m_k =  np.array(x_list)
         u_m = np.array(u_list)
         
-        if names_dual_var is None:
-            names_dual_var = [ (chr(ord(name[0])+1)+name[1:]) for name in self.namesv]
-        ustar = Polyhedral(x_m_k,u_m,xtilde_m_k,utilde_m,namef=self.namef+'*',namesv=names_dual_var )
+        if namesv is None:
+            namesv = [ (chr(ord(name[0])+1)+name[1:]) for name in self.namesv]
+        namefstar = (self.namef+'*' if len(self.namef) >0 else '')
+        ustar = Polyhedral(x_m_k,u_m,xtilde_m_k,utilde_m,namef=namefstar,namesv=namesv )
 
         return (ustar)
         
@@ -346,8 +356,8 @@ def polyhedral_from_strings(expr_fun_str ,expr_dom_strs = [], verbose= 0):
     list_v = []
     for expr in expr_fun.args:
         coeffs = expr.as_coefficients_dict() 
-        list_y.append([coeffs.get(v,0) for v in variables] )
-        list_v.append(-coeffs.get(1,0))
+        list_y.append([float(coeffs.get(v,0)) for v in variables] )
+        list_v.append(-float(coeffs.get(1,0)))
     y_t_k = np.array(list_y)
     v_t = np.array(list_v)
     if len(expr_dom_strs) == 0:
@@ -365,8 +375,8 @@ def polyhedral_from_strings(expr_fun_str ,expr_dom_strs = [], verbose= 0):
         else:
             print('Not expected format.')
         coeffs = diff.as_coefficients_dict()
-        list_ytilde.append([coeffs.get(v,0) for v in variables] )
-        list_vtilde.append(-coeffs.get(1,0))
+        list_ytilde.append([float(coeffs.get(v,0)) for v in variables] )
+        list_vtilde.append(-float(coeffs.get(1,0)))
     ytilde_s_k = np.array(list_ytilde)
     vtilde_s = np.array(list_vtilde)
     return Polyhedral(y_t_k,v_t,ytilde_s_k,vtilde_s,namesv = [str(var) for var in variables] )
