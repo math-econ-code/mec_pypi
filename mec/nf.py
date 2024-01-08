@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse as sp
 from mec.lp import Tableau, two_phase
+from anytree import Node, RenderTree
 
 def create_connected_dag(num_nodes, num_edges, zero_node = 0, seed=777):
     np.random.seed(seed)
@@ -107,7 +108,7 @@ class Network_problem:
                                      decision_var_names_j = [arcsnames[i] for i in self.nonbasis(active_basis)]
                                     )
         the_arcs_indices = list(active_basis) + list(set(range(self.nba)) - set(active_basis))
-        self.a_k = {k: the_arcs_indices[k] for k in range(self.nba)}
+        self.a_k = the_arcs_indices
         self.k_a = {the_arcs_indices[k]:k for k in range(self.nba)}
 
         
@@ -181,11 +182,11 @@ class Network_problem:
         mu_a[self.basis(basis)] = np.linalg.solve(self.B(),self.q0_z)
         return mu_a
         
-    def psol_z(self,basis = None):
+    def p0sol_z(self,basis = None):
         return (np.linalg.solve(self.B(basis).T,self.c_a[self.basis(basis)]))
     
     def gain_a(self, basis = None):
-        p_z = self.psol_z(basis)
+        p_z = self.p0sol_z(basis)
         g_a = self.c_a.copy()
         g_a[self.nonbasis(basis)] = self.N(basis).T @ p_z 
         return g_a
@@ -214,7 +215,7 @@ class Network_problem:
             if verbose>0:
                 print('Optimal solution found.\n=======================')
             if draw:
-                mu_a,p_z,g_a = self.musol_a(),self.psol_z(),self.gain_a()
+                mu_a,p_z,g_a = self.musol_a(),self.p0sol_z(),self.gain_a()
                 self.draw(p_z = p_z,mu_a=mu_a)
             return(0)
         else:
@@ -229,10 +230,59 @@ class Network_problem:
                     print('entering=',entering_a)
                     print('departing=',departing_a)
                 if draw:
-                    mu_a,p_z,g_a = self.musol_a(),self.psol_z(),self.gain_a()
+                    mu_a,p_z,g_a = self.musol_a(),self.p0sol_z(),self.gain_a()
                     self.draw(p_z = p_z,mu_a=mu_a, gain_a = g_a, entering_a = entering_a, departing_a = departing_a)
                     
                 self.tableau_update(entering_a,departing_a)
                 return(2)
                 
+class EQF_problem(Network_problem):
+    def __init__(self, nodesList,arcsList,galois_xy,q_z , active_basis = None, zero_node = 0, pos=None,seed=777, verbose=0):
+        c_a = np.zeros(len(arcsList))
+        Network_problem.__init__(self, nodesList,arcsList,c_a,q_z , active_basis, zero_node, pos,seed, verbose)
+        self.galois_xy = galois_xy
+        self.create_pricing_tree()
 
+    def create_pricing_tree(self, basis =None, verbose = False):
+        the_graph = nx.DiGraph()
+        the_graph.add_edges_from([self.arcsList[a] for a in self.basis(basis)])
+
+        self.tree = {}
+
+        def create_anytree(node, parent=None):
+            if node not in self.tree:
+                self.tree[node] = Node(name=node, parent=parent)
+            else:
+                self.tree[node].parent = parent
+            for child in list(the_graph.neighbors(node)) + list(the_graph.predecessors(node)):
+                if parent is None :
+                    create_anytree(child, self.tree[node])
+                elif child != parent.name:  # Prevent going back to the parent
+                    create_anytree(child, self.tree[node])
+                    
+        create_anytree(self.nodesList[self.zero_node])
+        if verbose:
+            for pre, fill, node in RenderTree(self.tree[self.nodesList[self.zero_node]]):
+                print("%s%s" % (pre, node.name))
+
+
+    def psol_z(self, current_price=0):
+        nodename = self.nodesList[self.zero_node]
+        self.set_prices_r(nodename,current_price)
+        p_z = np.zeros(self.nbz)
+        for (z,thename) in enumerate(self.nodesList):
+            p_z[z] = self.tree[thename].price
+        return(p_z)
+        
+
+    def set_prices_r(self,nodename, current_price=0):
+        self.tree[nodename].price = current_price
+        for child in self.tree[nodename].children:
+            self.set_prices_r(child.name,self.galois_xy[(child.name,nodename)](current_price))
+
+    def cost_improvement_a(self, basis = None):
+        print('hello')
+        p_z = self.psol_z()
+        return np.array([self.galois_xy[(x,y)] (p_z[self.nodesDict[y]]) - p_z[self.nodesDict[x]] for (x,y) in self.arcsList])
+
+        
