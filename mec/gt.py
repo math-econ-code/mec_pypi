@@ -174,24 +174,27 @@ class Bimatrix_game:
         self.B_i_j = B_i_j
         self.nbi,self.nbj = A_i_j.shape
 
-    def mangasarian_stone_solve(self):
+    def zero_sum_solve(self, verbose=0):
+        return Matrix_game(self.A_i_j).solve(verbose)
+
+    def mangasarian_stone_solve(self, verbose=0):
         model=grb.Model()
         model.Params.OutputFlag = 0
         model.params.NonConvex = 2
         p_i = model.addMVar(shape = self.nbi)
         q_j = model.addMVar(shape = self.nbj)
-        α = model.addMVar(shape = 1, lb = -grb.GRB.INFINITY)  # alternative to lb=-inf: add constant to ensure A_i_j > 0
-        β = model.addMVar(shape = 1, lb = -grb.GRB.INFINITY)  # and B_i_j > 0, and adjust val1 and val2 at the end
+        α = model.addMVar(shape = 1, lb = -grb.GRB.INFINITY)
+        β = model.addMVar(shape = 1, lb = -grb.GRB.INFINITY)
         model.setObjective(α + β - p_i @ (self.A_i_j + self.B_i_j) @ q_j, sense = grb.GRB.MINIMIZE)
         model.addConstr(α * np.ones((self.nbi,1)) - self.A_i_j @ q_j >= 0)
         model.addConstr(β * np.ones((self.nbj,1)) - self.B_i_j.T @ p_i >= 0)
         model.addConstr(p_i.sum() == 1)
         model.addConstr(q_j.sum() == 1)
         model.optimize()
-        thesol = np.array(model.getAttr('x'))
-        sol_dict = {'val1': thesol[-2], 'val2': thesol[-1],
-                    'p_i': thesol[:self.nbi], 'q_j': thesol[self.nbi:(self.nbi+self.nbj)]}
-        return(sol_dict)
+        sol = np.array(model.getAttr('x'))
+        if verbose > 0: print('p_i =', sol[:self.nbi], '\nq_j =', sol[self.nbi:(self.nbi+self.nbj)])
+        return {'p_i': sol[:self.nbi], 'q_j': sol[self.nbi:(self.nbi+self.nbj)],
+                'val1': sol[-2], 'val2': sol[-1]}
 
     def lemke_howson_solve(self,verbose = 0):
         A_i_j = self.A_i_j - np.min(self.A_i_j) + 1     # ensures that matrices are positive
@@ -219,10 +222,9 @@ class Bimatrix_game:
         β = 1 /  x_i.sum()
         p_i = x_i * β
         q_j = y_j * α
-        sol_dict = {'val1': α + np.min(self.A_i_j) - 1,
-                    'val2': β + np.min(self.B_i_j) - 1,
-                    'p_i': p_i, 'q_j': q_j}
-        return(sol_dict)
+        return {'p_i': p_i, 'q_j': q_j,
+                'val1': α + np.min(self.A_i_j) - 1,
+                'val2': β + np.min(self.B_i_j) - 1}
 
 
 class TwoBases:
