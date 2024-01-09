@@ -5,54 +5,64 @@ from mec.lp import Tableau
 
 
 class Matrix_game:
-    def __init__(self,Phi_i_j):
-        self.nbi,self.nbj = Phi_i_j.shape
-        self.Phi_i_j = Phi_i_j
+    def __init__(self, A_i_j):
+        self.nbi,self.nbj = A_i_j.shape
+        self.A_i_j = A_i_j
 
     def BRI(self,j):
-        return np.argwhere(self.Phi_i_j[:,j] == np.max(self.Phi_i_j[:,j])).flatten()
+        return np.argwhere(self.A_i_j[:,j] == np.max(self.A_i_j[:,j])).flatten()
 
     def BRJ(self,i):
-        return np.argwhere(self.Phi_i_j[i,:] == np.min(self.Phi_i_j[i,:])).flatten()
+        return np.argwhere(self.A_i_j[i,:] == np.min(self.A_i_j[i,:])).flatten()
 
-    def compute_eq(self):
-        return [ (i,j) for i in range(self.nbi) for j in range(self.nbj) if ( (i in self.BRI(j) ) and (j in self.BRJ(i) ) ) ]
+    def purestrat_solve(self):
+        return [ (i,j) for j in range(self.nbj) for i in range(self.nbi) if ( (i in self.BRI(j)) and (j in self.BRJ(i)) ) ]
 
-    def minimax_LP(self):
-        model=grb.Model()
+    def solve(self, verbose=0):
+        model = grb.Model()
         model.Params.OutputFlag = 0
         y = model.addMVar(shape=self.nbj)
         model.setObjective(np.ones(self.nbj) @ y, grb.GRB.MAXIMIZE)
-        model.addConstr(self.Phi_i_j @ y <= np.ones(self.nbi))
-        model.optimize() 
+        model.addConstr(self.A_i_j @ y <= np.ones(self.nbi))
+        model.optimize()
         ystar = np.array(model.getAttr('x'))
         xstar = np.array(model.getAttr('pi'))
-        S = 1 /  xstar.sum()
-        p_i = S * xstar
-        q_j = S * ystar
-        return(p_i,q_j)
-        
-    def minimax_CP(self,gap_threshold = 1e-5,max_iter = 10000):
-        L1 = np.max(np.abs(self.Phi_i_j))
+        V_2 = 1 / model.getAttr('ObjVal')
+        p_i = V_2 * xstar
+        q_j = V_2 * ystar
+        if verbose > 0: print('p_i =', p_i, '\nq_j =', q_j)
+        return p_i, q_j
+
+    def simplex_solve(self, verbose=0):
+        tableau = Tableau(A_i_j = self.A_i_j, d_i = np.ones(self.nbi), c_j = np.ones(self.nbj),
+                          decision_var_names_j = ['y_'+str(j) for j in range(self.nbj)])
+        ystar, xstar, ystar_sum = tableau.simplex_solve()
+        p_i = xstar / ystar_sum
+        q_j = ystar / ystar_sum
+        if verbose > 0: print('p_i =', p_i, '\nq_j =', q_j)
+        return p_i, q_j
+
+    def chambolle_pock_solve(self, tol=10e-6, max_iter=10000):
+        L1 = np.max(np.abs(self.A_i_j))
         sigma, tau = 1/L1, 1/L1
 
-        p = np.ones(self.nbi) / self.nbi
-        q = np.ones(self.nbi) / self.nbj
-        q_prev = q.copy()
+        p_i = np.ones(self.nbi) / self.nbi
+        q_j = np.ones(self.nbi) / self.nbj
+        q_prev = q_j.copy()
 
         gap = np.inf
         i=0
-        while (gap >  gap_threshold) and (i < max_iter):
-            q_tilde = 2*q - q_prev
-            p *= np.exp(-sigma* self.Phi_i_j @ q_tilde)
-            p /= p.sum()
+        while (gap >  tol) and (i < max_iter):
+            q_tilde = 2*q_j - q_prev
+            p_i *= np.exp(-sigma * self.A_i_j @ q_tilde)
+            p_i /= p_i.sum()
 
-            q_prev = q.copy()
-            q *= np.exp(tau* self.Phi_i_j.T @ p)
-            q /= q.sum()
-            gap = np.max(self.Phi_i_j.T@p) - np.min(self.Phi_i_j@q)
+            q_prev = q_j.copy()
+            q_j *= np.exp(tau * self.A_i_j.T @ p_i)
+            q_j /= q_j.sum()
+            gap = np.max(self.A_i_j.T @ p_i) - np.min(self.A_i_j @ q_j)
             i += 1
-        return(p,q,gap,i)
+        return p_i, q_j, gap, i
 
 
 class LCP: # z >= 0, w = M z + q >= 0, z.w = 0
