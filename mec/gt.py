@@ -31,7 +31,7 @@ class Matrix_game:
         p_i = V_2 * xstar
         q_j = V_2 * ystar
         if verbose > 0: print('p_i =', p_i, '\nq_j =', q_j)
-        return p_i, q_j
+        return {'p_i': p_i, 'q_j': q_j, 'val': V_2}
 
     def simplex_solve(self, verbose=0):
         tableau = Tableau(A_i_j = self.A_i_j, d_i = np.ones(self.nbi), c_j = np.ones(self.nbj),
@@ -40,7 +40,7 @@ class Matrix_game:
         p_i = xstar / ystar_sum
         q_j = ystar / ystar_sum
         if verbose > 0: print('p_i =', p_i, '\nq_j =', q_j)
-        return p_i, q_j
+        return {'p_i': p_i, 'q_j': q_j, 'val': 1/ystar_sum}
 
     def chambolle_pock_solve(self, tol=10e-6, max_iter=10000):
         L1 = np.max(np.abs(self.A_i_j))
