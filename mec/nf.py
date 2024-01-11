@@ -209,6 +209,7 @@ class Network_problem:
     
     def iterate(self,  draw = False, verbose=0):
         entering_as = self.determine_entering_arcs()
+        print('entering = ',entering_as)
         if not entering_as:
             if verbose>0:
                 print('Optimal solution found.\n=======================')
@@ -219,6 +220,7 @@ class Network_problem:
         else:
             entering_a=entering_as[0]
             departing_a = self.determine_departing_arc(entering_a)
+            print('entering_a=', entering_a,'departing_a=', departing_a)
             if departing_a is None:
                 if verbose>0:
                     print('Unbounded solution.')
@@ -232,18 +234,50 @@ class Network_problem:
                     self.draw(p_z = p_z,mu_a=mu_a, gain_a = g_a, entering_a = entering_a, departing_a = departing_a)
                     
                 self.tableau_update(entering_a,departing_a)
+                self.tableau
                 return(2)
                 
-class EQF_problem(Network_problem):
+class EQF_problem:
     def __init__(self, nodesList, arcsList, galois_xy, q_z, active_basis=None, zero_node=0, pos=None, seed=777, verbose=0):
-        c_a = np.zeros(len(arcsList))
-        Network_problem.__init__(self, nodesList, arcsList, c_a, q_z, active_basis, zero_node, pos, seed, verbose)
+
+        self.zero_node = zero_node
+        self.nbz = len(nodesList)
+        self.nba = len(arcsList)
+        self.nodesList = nodesList
+        self.arcsList = arcsList
+        self.nodesDict = {node:node_ind for (node_ind,node) in enumerate(self.nodesList)}
+        self.arcsDict = {arc:arc_ind for (arc_ind,arc) in enumerate(self.arcsList)}
+        if verbose>1:
+            print('Number of nodes = '+str(self.nbz)+'; number of arcs = '+str(self.nba)+'.')
+
+        data = np.concatenate([-np.ones(self.nba),np.ones(self.nba)])
+        arcsIndices = list(range(self.nba))
+        arcsOrigins = [self.nodesDict[o] for o,d in self.arcsList]
+        arcsDestinations = [self.nodesDict[d] for o,d in self.arcsList]
+        
+        znotzero = [i for i in range(self.nbz) if i != zero_node]
+        self.q_z = q_z
+        self.q0_z = q_z[znotzero]
+        
+        self.nabla_a_z = np.array(sp.csr_matrix((data, (arcsIndices+arcsIndices, arcsOrigins+arcsDestinations)), shape = (self.nba,self.nbz)).todense())
+        self.nabla0_a_z = self.nabla_a_z[:,znotzero]
+        
+        self.basis = two_phase(self.nabla0_a_z.T,self.q0_z)
+        assert len(self.basis) == (self.nbz - 1)
+        
+        self.digraph = nx.DiGraph()
+        self.digraph.add_edges_from(arcsList)
+        if pos is None:
+            pos = nx.spring_layout(self.digraph, seed=seed)
+        self.pos = pos
+
+        #arcsNames = [str(x)+str(y) for (x,y) in self.arcsList]
         self.galois_xy = galois_xy
         self.create_pricing_tree()
 
-    def create_pricing_tree(self, basis =None, verbose = False):
+    def create_pricing_tree(self, verbose = False):
         the_graph = nx.DiGraph()
-        the_graph.add_edges_from([self.arcsList[a] for a in self.basis(basis)])
+        the_graph.add_edges_from([self.arcsList[a] for a in self.basis])
 
         self.tree = {}
 
@@ -260,10 +294,12 @@ class EQF_problem(Network_problem):
                     
         create_anytree(self.nodesList[self.zero_node])
         if verbose:
-            for pre, fill, node in RenderTree(self.tree[self.nodesList[self.zero_node]]):
-                print("%s%s" % (pre, node.name))
+            self.print_pricing_tree()
 
-
+    def print_pricing_tree(self):
+        for pre, fill, node in RenderTree(self.tree[self.nodesList[self.zero_node]]):
+            print("%s%s" % (pre, node.name))
+    
     def psol_z(self, current_price=0):
         nodename = self.nodesList[self.zero_node]
         self.set_prices_r(nodename,current_price)
@@ -278,9 +314,65 @@ class EQF_problem(Network_problem):
         for child in self.tree[nodename].children:
             self.set_prices_r(child.name,self.galois_xy[(child.name,nodename)](current_price))
 
-    def cost_improvement_a(self, basis = None):
-        print('hello')
-        p_z = self.psol_z()
-        return np.array([self.galois_xy[(x,y)] (p_z[self.nodesDict[y]]) - p_z[self.nodesDict[x]] for (x,y) in self.arcsList])
 
+    def cut_pricing_tree(self,a_exiting): # returns root of second connected component
+        x,y = self.arcsList[a_exiting]
+        print (x,y)
+        if (self.tree[y].parent == self.tree[x]):
+            return y
+        elif (self.tree[x].parent == self.tree[y]):
+            return x
+        else:
+            print('Error in pricing tree during cut phase.')
+    
+    def paste_pricing_tree(self,a_entering,z_oldroot):
+        x,y = self.arcsList[a_entering]
+
+        if (self.tree[z_oldroot] in self.tree[y].ancestors):
+            z_newroot , z_prec = y,x
+        elif (self.tree[z_oldroot] in self.tree[x].ancestors):
+            z_newroot , z_prec = x,y
+        else:
+            print('Error in pricing tree during paste phase.')
         
+        z = z_newroot
+        while (z_prec != z_oldroot):
+            znext = self.tree[z].parent.name
+            self.tree[z].parent = self.tree[z_prec]
+            z_prec = z
+            z = znext
+    
+    def iterate(self,  draw = False, verbose=0):
+    
+        p_z = self.psol_z()
+        cost_improvement_a = np.array([self.galois_xy[(x,y)] (p_z[self.nodesDict[y]]) - p_z[self.nodesDict[x]] for (x,y) in self.arcsList])
+        entering_as = np.where(cost_improvement_a )[0].tolist() 
+        print('entering = ',entering_as)
+        if not entering_as:
+            if verbose>0:
+                print('Optimal solution found.\n=======================')
+            if draw:
+                mu_a,p_z,g_a = self.musol_a(),self.p0sol_z(),self.gain_a()
+                self.draw(p_z = p_z,mu_a=mu_a)
+            return(0)
+        else:
+            entering_a=entering_as[0]
+            departing_a = self.determine_departing_arc(entering_a)
+            print('entering_a=', entering_a,'departing_a=', departing_a)
+            if departing_a is None:
+                if verbose>0:
+                    print('Unbounded solution.')
+                return(1)
+            else:
+                if verbose>1:
+                    print('entering=',entering_a)
+                    print('departing=',departing_a)
+                if draw:
+                    mu_a,p_z,g_a = self.musol_a(),self.p0sol_z(),self.gain_a()
+                    self.draw(p_z = p_z,mu_a=mu_a, gain_a = g_a, entering_a = entering_a, departing_a = departing_a)
+                    
+                z_oldroot = self.cut_pricing_tree(departing_a)
+                self.paste_pricing_tree(entering_a,z_oldroot)
+                self.basis.remove(departing_a)
+                self.basis.append(entering_a)
+                return(2)
