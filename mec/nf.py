@@ -464,30 +464,35 @@ class Bipartite_EQF_problem:
         plt.figure(figsize=figsize)
         plt.show()
 
-    def create_pricing_tree(self, verbose = False):
-        the_graph = nx.DiGraph()
-        the_graph.add_edges_from([self.arcsList[a] for a in self.basis])
-
-        self.tree = {}
-
-        def create_anytree(node, parent=None):
-            if node not in self.tree:
-                self.tree[node] = Node(name=node, parent=parent)
+    def northwest_rule(self,display_tree=False):
+        x,y=0,0
+        res_x,res_y = self.n_x.copy(),self.m_y.copy()
+        current_parent = 'x'+str(x)
+        current_parent_node = Node(name = current_parent,parent = None)
+        root_node = current_parent_node
+        current_parent_node.price = 0
+        while (x<self.nbx) & (y<self.nby):
+            current_child = ('y'+str(y) if current_parent[0]=='x' else 'x'+str(x))
+            current_child_node = Node(name = current_child,parent = current_parent_node)
+            current_child_node.price = self.galois_xy[(current_child,current_parent)](current_parent_node.price)
+            if res_x[x] <= res_y[y]:
+                res_x[x],res_y[y] = 0,res_y[y]-res_x[x]
+                if current_parent[0]=='x':
+                    current_parent = 'y'+str(y)
+                    current_parent_node = current_child_node
+                x = x+1
             else:
-                self.tree[node].parent = parent
-            for child in list(the_graph.neighbors(node)) + list(the_graph.predecessors(node)):
-                if parent is None :
-                    create_anytree(child, self.tree[node])
-                elif child != parent.name:  # Prevent going back to the parent
-                    create_anytree(child, self.tree[node])
-                    
-        create_anytree(self.nodesList[self.zero_node])
-        if verbose:
-            self.print_pricing_tree()
-
-    def print_pricing_tree(self):
-        for pre, fill, node in RenderTree(self.tree[self.nodesList[self.zero_node]]):
-            print("%s%s" % (pre, node.name))
+                res_x[x],res_y[y] = res_x[x]-res_y[y],0
+                if current_parent[0]=='y':
+                    current_parent = 'x'+str(x)
+                    current_parent_node = current_child_node
+                y = y+1
+            
+        if display_tree:
+            for pre, fill, node in RenderTree(root_node):
+                print("%s%s%s%s" % (pre, node.name,', p=' , node.price))
+                
+        return root_node
     
     def psol_z(self, current_price=0):
         nodename = self.nodesList[self.zero_node]
