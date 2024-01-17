@@ -236,7 +236,8 @@ class Network_problem:
                 self.tableau_update(entering_a,departing_a)
                 self.tableau
                 return(2)
-                
+
+
 class EQF_problem:
     def __init__(self, nodesList, arcsList, galois_xy, q_z, active_basis=None, zero_node=0, pos=None, seed=777, verbose=0):
 
@@ -274,6 +275,8 @@ class EQF_problem:
         #arcsNames = [str(x)+str(y) for (x,y) in self.arcsList]
         self.galois_xy = galois_xy
         self.create_pricing_tree()
+        
+        
 
     def create_pricing_tree(self, verbose = False):
         the_graph = nx.DiGraph()
@@ -376,3 +379,137 @@ class EQF_problem:
                 self.basis.remove(departing_a)
                 self.basis.append(entering_a)
                 return(2)
+
+##################################################################
+##################################################################
+##################################################################
+
+
+                
+class Bipartite_EQF_problem:
+    def __init__(self, galois_xy, n_x,m_y, seed=777, verbose=0):
+
+        self.nbx,self.nby = len(n_x),len(m_y)
+        self.nba = self.nbx*self.nby
+
+        
+        self.digraph = nx.DiGraph()
+        self.digraph.add_nodes_from(['x'+str(x) for x in range(self.nbx)], bipartite=0)
+        self.digraph.add_nodes_from(['y'+str(y) for y in range(self.nby)], bipartite=1)
+        
+        self.digraph.add_edges_from([('x'+str(x),'y'+str(y)) for x in range(self.nbx) for y in range(self.nby)])
+        bottom_nodes, top_nodes = nx.bipartite.sets(self.digraph)
+        self.pos = {}
+        self.pos.update((node, (1, index)) for index, node in enumerate(bottom_nodes))  # Set one side for one set
+        self.pos.update((node, (2, index)) for index, node in enumerate(top_nodes))
+        self.galois_xy = galois_xy
+        #self.create_pricing_tree()
+        
+    def draw(self):
+        nx.draw(self.digraph, self.pos, with_labels=True)
+        plt.show()
+
+    def create_pricing_tree(self, verbose = False):
+        the_graph = nx.DiGraph()
+        the_graph.add_edges_from([self.arcsList[a] for a in self.basis])
+
+        self.tree = {}
+
+        def create_anytree(node, parent=None):
+            if node not in self.tree:
+                self.tree[node] = Node(name=node, parent=parent)
+            else:
+                self.tree[node].parent = parent
+            for child in list(the_graph.neighbors(node)) + list(the_graph.predecessors(node)):
+                if parent is None :
+                    create_anytree(child, self.tree[node])
+                elif child != parent.name:  # Prevent going back to the parent
+                    create_anytree(child, self.tree[node])
+                    
+        create_anytree(self.nodesList[self.zero_node])
+        if verbose:
+            self.print_pricing_tree()
+
+    def print_pricing_tree(self):
+        for pre, fill, node in RenderTree(self.tree[self.nodesList[self.zero_node]]):
+            print("%s%s" % (pre, node.name))
+    
+    def psol_z(self, current_price=0):
+        nodename = self.nodesList[self.zero_node]
+        self.set_prices_r(nodename,current_price)
+        p_z = np.zeros(self.nbz)
+        for (z,thename) in enumerate(self.nodesList):
+            p_z[z] = self.tree[thename].price
+        return(p_z)
+        
+
+    def set_prices_r(self,nodename, current_price=0):
+        self.tree[nodename].price = current_price
+        for child in self.tree[nodename].children:
+            self.set_prices_r(child.name,self.galois_xy[(child.name,nodename)](current_price))
+
+
+    def cut_pricing_tree(self,a_exiting): # returns root of second connected component
+        x,y = self.arcsList[a_exiting]
+        print (x,y)
+        if (self.tree[y].parent == self.tree[x]):
+            return y
+        elif (self.tree[x].parent == self.tree[y]):
+            return x
+        else:
+            print('Error in pricing tree during cut phase.')
+    
+    def paste_pricing_tree(self,a_entering,z_oldroot):
+        x,y = self.arcsList[a_entering]
+
+        if (self.tree[z_oldroot] in self.tree[y].ancestors):
+            z_newroot , z_prec = y,x
+        elif (self.tree[z_oldroot] in self.tree[x].ancestors):
+            z_newroot , z_prec = x,y
+        else:
+            print('Error in pricing tree during paste phase.')
+        
+        z = z_newroot
+        while (z_prec != z_oldroot):
+            znext = self.tree[z].parent.name
+            self.tree[z].parent = self.tree[z_prec]
+            z_prec = z
+            z = znext
+    
+    def iterate(self,  draw = False, verbose=0):
+    
+        p_z = self.psol_z()
+        cost_improvement_a = np.array([self.galois_xy[(x,y)] (p_z[self.nodesDict[y]]) - p_z[self.nodesDict[x]] for (x,y) in self.arcsList])
+        entering_as = np.where(cost_improvement_a )[0].tolist() 
+        print('entering = ',entering_as)
+        if not entering_as:
+            if verbose>0:
+                print('Optimal solution found.\n=======================')
+            if draw:
+                mu_a,p_z,g_a = self.musol_a(),self.p0sol_z(),self.gain_a()
+                self.draw(p_z = p_z,mu_a=mu_a)
+            return(0)
+        else:
+            entering_a=entering_as[0]
+            departing_a = self.determine_departing_arc(entering_a)
+            print('entering_a=', entering_a,'departing_a=', departing_a)
+            if departing_a is None:
+                if verbose>0:
+                    print('Unbounded solution.')
+                return(1)
+            else:
+                if verbose>1:
+                    print('entering=',entering_a)
+                    print('departing=',departing_a)
+                if draw:
+                    mu_a,p_z,g_a = self.musol_a(),self.p0sol_z(),self.gain_a()
+                    self.draw(p_z = p_z,mu_a=mu_a, gain_a = g_a, entering_a = entering_a, departing_a = departing_a)
+                    
+                z_oldroot = self.cut_pricing_tree(departing_a)
+                self.paste_pricing_tree(entering_a,z_oldroot)
+                self.basis.remove(departing_a)
+                self.basis.append(entering_a)
+                return(2)
+                
+                
+                
