@@ -189,9 +189,6 @@ class Bimatrix_game:
                                                               [100, 100, 150]]) - penalty_data)
             return nonzerosum_game
 
-    def zero_sum_solve(self, verbose=0):
-        return Matrix_game(self.A_i_j).solve(verbose)
-
     def is_Nash(self, p_i, q_j, tol=1e-5):
         for i in range(self.nbi):
             if np.eye(self.nbi)[i] @ self.A_i_j @ q_j > p_i @ self.A_i_j @ q_j + tol:
@@ -202,6 +199,11 @@ class Bimatrix_game:
                 print('Pure strategy j =', j, 'beats q_j.')
                 return False
         return True
+
+    def zero_sum_solve(self, verbose=0):
+        return Matrix_game(self.A_i_j).solve(verbose)
+
+
 
     def mangasarian_stone_solve(self, verbose=0):
         model=grb.Model()
