@@ -397,6 +397,7 @@ class Bipartite_EQF_problem:
     def __init__(self, galois_xy, n_x,m_y, label_galois_xy=None, seed=777, verbose=0):
         self.n_x,self.m_y = n_x,m_y
         self.nbx,self.nby = len(n_x),len(m_y)
+        self.nbz = self.nbx + self.nby
         self.nba = self.nbx*self.nby
 
         
@@ -411,9 +412,9 @@ class Bipartite_EQF_problem:
         self.pos.update((node, (2, index)) for index, node in enumerate(top_nodes))
         self.galois_xy = galois_xy
         self.label_galois_xy = label_galois_xy
-        #self.create_pricing_tree()
+        self.create_pricing_tree()
    
-    def draw(self,drawPrice =  False, mu_a = None, plot_galois = False, entering_a = None, departing_a = None ,gain_a = None, figsize=(50, 30)):
+    def draw(self,draw_prices =  False, mu_a = None, plot_galois = False, entering_a = None, departing_a = None ,gain_a = None, figsize=(50, 30)):
         
         edge_labels = {e: '' for e in self.digraph.edges()}
         
@@ -435,18 +436,26 @@ class Bipartite_EQF_problem:
         # Adjust positions of labels
         #label_pos = adjust_label_pos(self.pos, edge_labels, shift_factor=0.1)
         
-        nx.draw_networkx_edge_labels(self.digraph,self.pos,
-                                    edge_labels=edge_labels,
-                                    font_color='red')
-#                                    label_pos=label_pos)
-                    
+        label_pos = nx.draw_networkx_edge_labels(self.digraph, self.pos, edge_labels=edge_labels)
+        
+        #label_pos = {}
+        for (x,y) in self.digraph.edges():
+            the_pos_array = 0.9 * np.array( self.pos[x]) +0.1*np.array( self.pos[y] ) 
+            label_pos[(x,y)].set(position = (the_pos_array[0],the_pos_array[1]))
+        print(label_pos)
+        # Redraw edge labels with new positions
+ #       for (u, v), (x, y) in new_label_pos.items():
+ #           label = edge_labels[(u, v)]
+ #           plt.text(x, y, label, horizontalalignment='left',font_color='red')
+        
+        nx.draw_networkx_edge_labels(self.digraph,self.pos, edge_labels=edge_labels, font_color='red', label_pos=label_pos)
                     
         q_z = np.concatenate([self.n_x,self.m_y])
         labels = {z: f"{ ('n'*self.nbx+ 'm'*self.nby)[i]}={q_z[i]:.0f}"+'\n'+z+'\n' for i,z in enumerate(self.digraph.nodes()) }
         label_pos = {z: (position[0], position[1] ) for z, position in self.pos.items()}        
-        if drawPrice:
-            p_z = np.concatenate([np.zeros(1),p_z])
-            labels = {z: labels[z]+ f"\np={p_z[i]:.0f}" for i,z in enumerate(self.digraph.nodes())} 
+        if draw_prices:
+            p_z = self.p_z()
+            labels = {z: labels[z]+ f"p={p_z[i]:.0f}" for i,z in enumerate(self.digraph.nodes())} 
         
         nx.draw_networkx_labels(self.digraph, label_pos, labels,font_size=10,verticalalignment = 'center')
 
@@ -464,17 +473,19 @@ class Bipartite_EQF_problem:
         plt.figure(figsize=figsize)
         plt.show()
 
-    def northwest_rule(self,display_tree=False):
+    def create_pricing_tree(self,display_tree=False):
         x,y=0,0
         res_x,res_y = self.n_x.copy(),self.m_y.copy()
         current_parent = 'x'+str(x)
         current_parent_node = Node(name = current_parent,parent = None)
         root_node = current_parent_node
+        self.tree = {current_parent: root_node}
         current_parent_node.price = 0
         while (x<self.nbx) & (y<self.nby):
             current_child = ('y'+str(y) if current_parent[0]=='x' else 'x'+str(x))
             current_child_node = Node(name = current_child,parent = current_parent_node)
             current_child_node.price = self.galois_xy[(current_child,current_parent)](current_parent_node.price)
+            self.tree[current_child] = current_child_node
             if res_x[x] <= res_y[y]:
                 res_x[x],res_y[y] = 0,res_y[y]-res_x[x]
                 if current_parent[0]=='x':
@@ -487,30 +498,26 @@ class Bipartite_EQF_problem:
                     current_parent = 'x'+str(x)
                     current_parent_node = current_child_node
                 y = y+1
-            
+        
         if display_tree:
-            for pre, fill, node in RenderTree(root_node):
-                print("%s%s%s%s" % (pre, node.name,', p=' , node.price))
+            self.display_tree()
                 
         return root_node
     
-    def psol_z(self, current_price=0):
-        nodename = self.nodesList[self.zero_node]
-        self.set_prices_r(nodename,current_price)
+    def display_tree(self):
+        for pre, fill, node in RenderTree(self.tree['x0']):
+            print("%s%s%s%s" % (pre, node.name,', p=' , node.price))
+    
+    def p_z(self, current_price=0):
         p_z = np.zeros(self.nbz)
-        for (z,thename) in enumerate(self.nodesList):
-            p_z[z] = self.tree[thename].price
-        return(p_z)
+        for z in range(self.nbz):
+            p_z[z] = self.tree[list(self.digraph.nodes())[z]].price
+
+        return p_z
         
 
-    def set_prices_r(self,nodename, current_price=0):
-        self.tree[nodename].price = current_price
-        for child in self.tree[nodename].children:
-            self.set_prices_r(child.name,self.galois_xy[(child.name,nodename)](current_price))
-
-
     def cut_pricing_tree(self,a_exiting): # returns root of second connected component
-        x,y = self.arcsList[a_exiting]
+        x,y = list(self.digraph.edges())[a_exiting]
         print (x,y)
         if (self.tree[y].parent == self.tree[x]):
             return y
@@ -520,7 +527,7 @@ class Bipartite_EQF_problem:
             print('Error in pricing tree during cut phase.')
     
     def paste_pricing_tree(self,a_entering,z_oldroot):
-        x,y = self.arcsList[a_entering]
+        x,y = list(self.digraph.edges())[a_entering]
 
         if (self.tree[z_oldroot] in self.tree[y].ancestors):
             z_newroot , z_prec = y,x
@@ -535,11 +542,14 @@ class Bipartite_EQF_problem:
             self.tree[z].parent = self.tree[z_prec]
             z_prec = z
             z = znext
-    
+
+    def cost_improvement_a(self):
+        p_z = self.p_z()
+        return np.array([self.galois_xy[(x,y)] (p_z[ self.nbx + int(y[1:])]) - p_z[ int(x[1:])] for (x,y) in self.digraph.edges()])
+
+        
     def iterate(self,  draw = False, verbose=0):
-    
-        p_z = self.psol_z()
-        cost_improvement_a = np.array([self.galois_xy[(x,y)] (p_z[self.nodesDict[y]]) - p_z[self.nodesDict[x]] for (x,y) in self.arcsList])
+        cost_improvement_a = self.cost_improvement_a()
         entering_as = np.where(cost_improvement_a )[0].tolist() 
         print('entering = ',entering_as)
         if not entering_as:
