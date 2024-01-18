@@ -177,7 +177,7 @@ class Bimatrix_game:
     def zero_sum_solve(self, verbose=0):
         return Matrix_game(self.A_i_j).solve(verbose)
 
-    def is_solution(self, p_i, q_j, tol=1e-5):
+    def is_Nash(self, p_i, q_j, tol=1e-5):
         for i in range(self.nbi):
             if np.eye(self.nbi)[i] @ self.A_i_j @ q_j > p_i @ self.A_i_j @ q_j + tol:
                 print('Pure strategy', i, 'beats p_i.')
