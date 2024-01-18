@@ -174,11 +174,11 @@ class Bimatrix_game:
         self.B_i_j = B_i_j
         self.nbi,self.nbj = A_i_j.shape
 
-    def create_penalty_game(zeroSum=False):
+    def create_penalty_game(zero_sum=False):
         penalty_data = np.array([[53.21, 71.35, 93.80],
                                  [90.26, 42.81, 86.12],
                                  [96.88, 100.0, 75.43]])
-        if zeroSum :
+        if zero_sum :
             zerosum_game = Bimatrix_game(A_i_j = penalty_data,
                                          B_i_j = 100 - penalty_data)
             return zerosum_game
