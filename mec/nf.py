@@ -507,27 +507,36 @@ class Bipartite_EQF_problem:
             self.tree[z].parent = self.tree[z_prec]
             z_prec = z
             z = znext
+
+    def determine_departing_arc(self, entering_a, basis=None):
+            entering_k = self.k_a[entering_a]
+        departing_k = self.tableau.determine_departing(entering_k)
+        if departing_k is None:
+            departing_a = None
+        else:
+            departing_a = self.a_k[departing_k]
+        return (departing_a)
         
     def iterate(self, draw=False, verbose=0):
         cost_improvement_a = self.cost_improvement_a()
         #entering_as = list(self.digraph.edges())[np.where(cost_improvement_a)]
-        entering_as = [self.digraph.edges()[a] for a in range(self.nba) if cost_improvement_a[a] > 0]
-        print('entering = ', entering_as)
+        entering_as = [list(self.digraph.edges())[a] for a in range(self.nba) if cost_improvement_a[a] > 0]
+        print('entering =', entering_as)
         if not entering_as:
             if verbose>0:
                 print('Optimal solution found.\n=======================')
-            if draw:
-                mu_a,p_z,g_a = self.musol_a(),self.p0sol_z(),self.gain_a()
-                self.draw(p_z = p_z,mu_a=mu_a)
-            return(0)
+            #if draw:
+            #    mu_a,p_z,g_a = self.musol_a(),self.p0sol_z(),self.gain_a()
+            #    self.draw(p_z = p_z,mu_a=mu_a)
+            return 0
         else:
             entering_a = entering_as[0]
             departing_a = self.determine_departing_arc(entering_a)
-            print('entering_a=', entering_a,'departing_a=', departing_a)
+            print('entering_a =', entering_a,', departing_a =', departing_a)
             if departing_a is None:
                 if verbose>0:
                     print('Unbounded solution.')
-                return(1)
+                return 1
             else:
                 if verbose>1:
                     print('entering=',entering_a)
@@ -540,7 +549,6 @@ class Bipartite_EQF_problem:
                 self.paste_pricing_tree(entering_a,z_oldroot)
                 self.basis.remove(departing_a)
                 self.basis.append(entering_a)
-                return(2)
-                
+                return 2
                 
                 
