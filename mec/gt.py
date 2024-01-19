@@ -178,18 +178,17 @@ class Bimatrix_game:
         penalty_data = np.array([[53.21, 71.35, 93.80],
                                  [90.26, 42.81, 86.12],
                                  [96.88, 100.0, 75.43]])
-        if zero_sum :
-            zerosum_game = Bimatrix_game(A_i_j = penalty_data,
-                                         B_i_j = 100 - penalty_data)
+        if zero_sum:
+            zerosum_game = Bimatrix_game(A_i_j = penalty_data, B_i_j = 100 - penalty_data)
             return zerosum_game
-        else :
+        else:
             nonzerosum_game = Bimatrix_game(A_i_j = penalty_data,
                                             B_i_j = np.array([[150, 100, 100],
                                                               [100, 150, 100],
                                                               [100, 100, 150]]) - penalty_data)
             return nonzerosum_game
 
-    def is_Nash(self, p_i, q_j, tol=1e-5):
+    def is_NashEq(self, p_i, q_j, tol=1e-5):
         for i in range(self.nbi):
             if np.eye(self.nbi)[i] @ self.A_i_j @ q_j > p_i @ self.A_i_j @ q_j + tol:
                 print('Pure strategy i =', i, 'beats p_i.')
@@ -202,8 +201,6 @@ class Bimatrix_game:
 
     def zero_sum_solve(self, verbose=0):
         return Matrix_game(self.A_i_j).solve(verbose)
-
-
 
     def mangasarian_stone_solve(self, verbose=0):
         model=grb.Model()
