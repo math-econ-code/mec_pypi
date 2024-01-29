@@ -1,5 +1,7 @@
 import gurobipy as grb
 import numpy as np
+import sympy
+from sympy import *
 from mec.lp import Dictionary
 from mec.lp import Tableau
 
