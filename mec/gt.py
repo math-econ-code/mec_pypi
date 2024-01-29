@@ -141,7 +141,6 @@ class LCP: # z >= 0, w = M z + q >= 0, z.w = 0
             labels = zis[:-1] + wis
             complements = {Symbol(keys[i]): Symbol(labels[i]) for i in range(2*self.nbi)}
             tab = Tableau(- np.block([self.M_i_j, np.ones((self.nbi,1))]), self.q_i, decision_var_names_j = zis, slack_var_names_i = wis)
-            __init__(self, A_i_j, d_i, c_j, decision_var_names_j, slack_var_names_i)
             entering_var = Symbol('z_0')
             departing_var = Symbol(wis[np.argmin(self.q_i)]) # if argmin not unique, takes smallest index (Bland's rule)
             while departing_var is not None and counter < maxit:
