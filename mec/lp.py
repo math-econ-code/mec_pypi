@@ -270,9 +270,8 @@ class Tableau(LP):
             pass
         return self.solution()
 
-    def solution(self):
-        x_j = np.zeros(self.nbj)
-        s_i = np.zeros(self.nbi)
+    def solution(self): # returns the primal variables x_j and dual variables y_i
+        x_j, s_i = np.zeros(self.nbj), np.zeros(self.nbi)
         for b in range(self.nbi):
             if self.k_b[b]<self.nbi:
                 s_i[self.k_b[b]] = self.tableau[self.i_b[b],-1]

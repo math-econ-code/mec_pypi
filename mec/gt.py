@@ -68,28 +68,31 @@ class Matrix_game:
 
 
 class LCP: # z >= 0, w = M z + q >= 0, z.w = 0
-    def __init__(self,M_i_j,q_i):
+    def __init__(self, M_i_j, q_i):
+        if M_i_j.shape[0] != M_i_j.shape[1]:
+            raise ValueError("M_i_j must be square.")
+        if M_i_j.shape[0] != len(q_i):
+            raise ValueError("M_i_j and q_i must be of the same size.")
         self.M_i_j = M_i_j
-        self.nbi,_ = M_i_j.shape
         self.q_i = q_i
+        self.nbi = len(q_i)
 
-    def qp_solve(self, silent = True, verbose = 0):
+    def qp_solve(self, silent=True, verbose=0):
         qp = grb.Model()
         if silent:
             qp.Params.OutputFlag = 0
         qp.Params.NonConvex = 2
-        zqp_i = qp.addMVar(shape = self.nbi)
-        wqp_i = qp.addMVar(shape = self.nbi)
-        qp.addConstr(self.M_i_j @ zqp_i - wqp_i == - self.q_i)
-        qp.setObjective(zqp_i @ wqp_i, sense = grb.GRB.MINIMIZE)
+        z = qp.addMVar(shape = self.nbi)
+        w = qp.addMVar(shape = self.nbi)
+        qp.addConstr(w - self.M_i_j @ z == self.q_i)
+        qp.setObjective(z @ w, sense = grb.GRB.MINIMIZE)
         qp.optimize()
-        z_i = np.array(qp.getAttr('x'))[:self.nbi]
-        if verbose > 0: print(z_i)
-        if verbose > 1:
-            w_i = self.M_i_j @ z_i + self.q_i
-            print(w_i)
-            print(z_i @ w_i)
-        return(z_i)
+        zsol, wsol, obj = z.x, w.x, qp.ObjVal
+        print('z.w =', obj)
+        if verbose > 0:
+            print('z =', zsol)
+            print('w =', wsol)
+        return zsol, wsol, obj
 
     def plot_cones(self):
         if self.nbi != 2:
@@ -124,48 +127,67 @@ class LCP: # z >= 0, w = M z + q >= 0, z.w = 0
         plt.xlim(-1.2, 1.2), plt.ylim(-1.2, 1.2)
         plt.show()
 
-    def lemke_solve(self,verbose=0,maxit=100):
+    def create_tableau(self, decision_var_names_j = None, slack_var_names_i = None, display=False):
+        if decision_var_names_j is None :
+            decision_var_names_j = ['z_'+str(i+1) for i in range(self.nbi)]
+        if slack_var_names_i is None :
+            slack_var_names_i = ['w_'+str(i+1) for i in range(self.nbi)]
+        tab = Tableau(A_i_j = -np.block([self.M_i_j, np.ones((self.nbi,1))]),
+                      d_i = self.q_i, c_j = None,
+                      decision_var_names_j=decision_var_names_j+['z_0'], slack_var_names_i=slack_var_names_i)
+        self.tableau = tab
+        if display: tab.display()
+
+    def LCP_initialize_basis(self, verbose=0, display=False):
+        self.create_tableau()
+        zis = self.tableau.decision_var_names_j
+        wis = self.tableau.slack_var_names_i
+        kent = 2*self.nbi # z_0 enters
+        kdep = np.argmin(self.q_i) # w_istar departs
+        self.tableau.update(kent, kdep)
+        if verbose>0: print((wis+zis)[kent] + ' enters, ' + (wis+zis)[kdep] + ' departs')
+        if display: self.tableau.display()
+        return kdep
+
+    def lemke_solve(self, verbose=0, maxit=100):
         counter = 0
-        zis = ['z_' + str(i+1) for i in range(self.nbi)]+['z_0']
-        wis = ['w_' + str(i+1) for i in range(self.nbi)]
         if all(self.q_i >= 0):
             print('==========')
             print('Solution found: trivial LCP (q >= 0).')
-            zsol=np.zeros(self.nbi)
-            wsol=self.q_i
-            for i in range(self.nbi): print(zis[i] + ' = 0')
-            for i in range(self.nbi): print(wis[i] + ' = ' + str(wsol[i]))
-            return zsol,wsol
+            zsol, wsol = np.zeros(self.nbi), self.q_i
+            return zsol, wsol
+        kdep = self.initialize_basis(verbose=verbose-1)
+        zis = self.tableau.decision_var_names_j
+        wis = self.tableau.slack_var_names_i
+        complements = list(self.nbi+np.arange(self.nbi)) + list(np.arange(self.nbi))
+        while counter < maxit:
+            counter += 1
+            kent = complements[kdep]
+            kdep = self.tableau.determine_departing(kent)
+            if kdep is None:
+                break
+            if verbose > 1:
+                print('Basis: ', [(wis+zis)[i] for i in self.tableau.k_b])
+                print((wis+zis)[kent], 'enters,', (wis+zis)[kdep], 'departs')
+            self.tableau.update(kent, kdep)
+            if kdep == 2*self.nbi:
+                break
+        print('==========')
+        if kdep == 2*self.nbi:
+            print('Solution found: z_0 departed basis.')
+            zsol, _, _ = self.tableau.solution()
+            wsol = self.M_i_j @ zsol[:-1] + self.q_i
+            if verbose > 0:
+                print('Complementarity: z.w = ' + str(zsol[:-1] @ wsol))
+                for i in range(self.nbi): print('z_'+str(i+1)+' = ' + str(zsol[i]))
+                for i in range(self.nbi): print('w_'+str(i+1)+' = ' + str(wsol[i]))
+            return zsol[:-1], wsol
+        elif counter == maxit:
+            print('Solution not found: maximum number of iterations (' + str(maxit) + ') reached.')
+            return None
         else:
-            keys = wis + zis[:-1]
-            labels = zis[:-1] + wis
-            complements = {Symbol(keys[i]): Symbol(labels[i]) for i in range(2*self.nbi)}
-            tab = Dictionary(- np.block([self.M_i_j, np.ones((self.nbi,1))]), self.q_i, decision_var_names_j = zis, slack_var_names_i = wis)
-            entering_var = Symbol('z_0')
-            departing_var = Symbol(wis[np.argmin(self.q_i)]) # if argmin not unique, takes smallest index (Bland's rule)
-            while departing_var is not None and counter < maxit:
-                counter += 1
-                tab.pivot(entering_var,departing_var,verbose=verbose)
-                if departing_var == Symbol('z_0') or counter == maxit:
-                    break
-                else:
-                    entering_var = complements[departing_var]
-                    departing_var = tab.determine_departing(entering_var)
-            print('==========')
-            if departing_var == Symbol('z_0'):
-                print('Solution found: z_0 departed basis.')
-                sol=tab.solution()
-                zsol=np.array([sol[Symbol(zis[i])] for i in range(self.nbi)])
-                wsol=np.array([sol[Symbol(wis[i])] for i in range(self.nbi)])
-                print('Complementarity: z.w = ' + str(zsol @ wsol))
-                for i in range(2*self.nbi): print(labels[i] + ' = ' + str(sol[Symbol(labels[i])]))
-                return zsol, wsol
-            elif counter == maxit:
-                print('Solution not found: maximum number of iterations (' + str(maxit) + ') reached.')
-                return None
-            else:
-                print('Solution not found: Ray termination.')
-                return None
+            print('Solution not found: Ray termination.')
+            return None
 
 
 class Bimatrix_game:
