@@ -68,14 +68,18 @@ class Matrix_game:
 
 
 class LCP: # z >= 0, w = M z + q >= 0, z.w = 0
-    def __init__(self, M_i_j, q_i):
+    def __init__(self, M_i_j, q_i, z_names_i = None, w_names_i = None):
         if M_i_j.shape[0] != M_i_j.shape[1]:
             raise ValueError("M_i_j must be square.")
         if M_i_j.shape[0] != len(q_i):
             raise ValueError("M_i_j and q_i must be of the same size.")
-        self.M_i_j = M_i_j
-        self.q_i = q_i
+        if z_names_i = None :
+            z_names_i = ['z_'+str(i+1) for i in range(self.nbi)]
+        if w_names_i = None :
+            w_names_i = ['w_'+str(i+1) for i in range(self.nbi)]
+        self.M_i_j, self.q_i = M_i_j, q_i
         self.nbi = len(q_i)
+        self.z_names_i, self.w_names_i = z_names_i, w_names_i
 
     def qp_solve(self, silent=True, verbose=0):
         qp = grb.Model()
@@ -127,14 +131,14 @@ class LCP: # z >= 0, w = M z + q >= 0, z.w = 0
         plt.xlim(-1.2, 1.2), plt.ylim(-1.2, 1.2)
         plt.show()
 
-    def create_tableau(self, decision_var_names_j = None, slack_var_names_i = None, display=False):
+    def create_tableau(self, display=False):
         if decision_var_names_j is None :
             decision_var_names_j = ['z_'+str(i+1) for i in range(self.nbi)]
         if slack_var_names_i is None :
             slack_var_names_i = ['w_'+str(i+1) for i in range(self.nbi)]
         tab = Tableau(A_i_j = -np.block([self.M_i_j, np.ones((self.nbi,1))]),
                       d_i = self.q_i, c_j = None,
-                      decision_var_names_j=decision_var_names_j+['z_0'], slack_var_names_i=slack_var_names_i)
+                      decision_var_names_j=self.z_names_i+['z_0'], slack_var_names_i=self.w_names_i)
         self.tableau = tab
         if display: tab.display()
 
