@@ -138,7 +138,7 @@ class LCP: # z >= 0, w = M z + q >= 0, z.w = 0
         self.tableau = tab
         if display: tab.display()
 
-    def LCP_initialize_basis(self, verbose=0, display=False):
+    def initialize_basis(self, verbose=0, display=False):
         self.create_tableau()
         zis = self.tableau.decision_var_names_j
         wis = self.tableau.slack_var_names_i
