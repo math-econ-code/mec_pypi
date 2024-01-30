@@ -73,9 +73,9 @@ class LCP: # z >= 0, w = M z + q >= 0, z.w = 0
             raise ValueError("M_i_j must be square.")
         if M_i_j.shape[0] != len(q_i):
             raise ValueError("M_i_j and q_i must be of the same size.")
-        if z_names_i = None :
+        if z_names_i is None :
             z_names_i = ['z_'+str(i+1) for i in range(self.nbi)]
-        if w_names_i = None :
+        if w_names_i is None :
             w_names_i = ['w_'+str(i+1) for i in range(self.nbi)]
         self.M_i_j, self.q_i = M_i_j, q_i
         self.nbi = len(q_i)
