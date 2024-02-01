@@ -282,8 +282,8 @@ class LTU_problem:
         self.nbx, self.nby = Φ_x_y.shape
         if λ_x_y is None: λ_x_y = np.ones(self.nbx, self.nby)/2  # λ_x_y = 1/2 if not provided (TU)
         self.λ_x_y = λ_x_y
-        if n_x is None: n_x = np.ones((1,self.nbx))
-        if m_y is None: m_y = np.ones((1,self.nby))
+        if n_x is None: n_x = np.ones(self.nbx)
+        if m_y is None: m_y = np.ones(self.nby)
         self.n_x, self.m_y = n_x, m_y
 
     def to_LCP(self):
@@ -336,7 +336,7 @@ class LTU_problem:
         usol = q_x / ( 2 * self.n_x * (sol_game['p_i'] @ (-self_game.A_i_j) @ sol_game['q_j']) )
         vsol = q_y / ( 2 * self.m_y * (sol_game['p_i'] @ (-self_game.A_i_j) @ sol_game['q_j']) )
         if verbose>0:
-            print('Matching matrix:\n', μsol.round(2))
+            print('Matching matrix:'), print(μsol.round(2))
             print('\nUtilities:')
             for x in range(self.nbx): print('u_' + str(x+1) + ' = ' + str(usol[x].round(2)))
             for y in range(self.nby): print('v_' + str(y+1) + ' = ' + str(vsol[y].round(2)))
