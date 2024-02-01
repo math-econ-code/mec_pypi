@@ -320,7 +320,7 @@ class LTU_problem:
         B = np.block([np.diag(b_xy_x.flatten()) @ M_X.T, np.diag(b_xy_y.flatten()) @ M_Y.T])
         return Bimatrix_game(A, B)
 
-    def solve(self, method='lemke_howson', verbose=1):
+    def solve(self, method='lemke_howson', verbose=0):
         self_game = self.bimatrix_game()
         if method == 'lemke_howson':
             sol_game = self_game.lemke_howson_solve(verbose=verbose)
@@ -335,11 +335,11 @@ class LTU_problem:
         μsol = p_x_y / ( 2 * self.Φ_x_y * (sol_game['p_i'] @ self_game.B_i_j @ sol_game['q_j']) )
         usol = q_x / ( 2 * self.n_x * (sol_game['p_i'] @ (-self_game.A_i_j) @ sol_game['q_j']) )
         vsol = q_y / ( 2 * self.m_y * (sol_game['p_i'] @ (-self_game.A_i_j) @ sol_game['q_j']) )
-
-        print('Matching matrix:\n', μsol.round(2))
-        print('\nUtilities:')
-        for x in range(self.nbx): print('u_' + str(x+1) + ' = ' + str(usol[x].round(2)))
-        for y in range(self.nby): print('v_' + str(y+1) + ' = ' + str(vsol[y].round(2)))
+        if verbose>0:
+            print('Matching matrix:\n', μsol.round(2))
+            print('\nUtilities:')
+            for x in range(self.nbx): print('u_' + str(x+1) + ' = ' + str(usol[x].round(2)))
+            for y in range(self.nby): print('v_' + str(y+1) + ' = ' + str(vsol[y].round(2)))
         return μsol, usol, vsol
 
 
