@@ -275,6 +275,73 @@ class Bimatrix_game:
                 'val1': α + np.min(self.A_i_j) - 1,
                 'val2': β + np.min(self.B_i_j) - 1}
 
+class LTU_problem:
+    def __init__(self, Φ_x_y, λ_x_y = None, n_x = None, m_y = None):
+        self.Φ_x_y = Φ_x_y
+        self.nbx, self.nby = Φ_x_y.shape
+        if λ_x_y is None: λ_x_y = np.ones(self.nbx, self.nby)/2  # λ_x_y = 1/2 if not provided (TU)
+        self.λ_x_y = λ_x_y
+        if n_x is None: n_x = np.ones((1,self.nbx))
+        if m_y is None: m_y = np.ones((1,self.nby))
+        self.n_x, self.m_y = n_x, m_y
+
+    def to_LCP(self):
+        M_X = np.kron( np.eye(self.nbx), np.ones(self.nby).T )
+        M_Y = np.kron( np.ones(self.nbx).T, np.eye(self.nby) )
+        Λ = np.diag(self.λ_x_y.flatten())
+        return LCP(M_i_j = np.block([[np.zeros((self.nbx*self.nby, self.nbx*self.nby)), Λ @ M_X.T, (np.eye(self.nbx*self.nby)-Λ) @ M_Y.T],
+                                     [-M_X, np.zeros((self.nbx, self.nbx)), np.zeros((self.nbx, self.nby))],
+                                     [-M_Y, np.zeros((self.nby, self.nbx)), np.zeros((self.nby, self.nby))]]),
+                   q_i = np.concatenate([-self.Φ_x_y.flatten()/2, self.n_x, self.m_y]))
+
+    def is_solution(self, μ, u, v, tol=10e-6, verbose=0):
+        self_LCP = self.to_LCP()
+        z = np.concatenate([μ.flatten(), u, v])
+        w = self_LCP.M_i_j @ z + self_LCP.q_i
+        if verbose > 0:
+            for i in range(self_LCP.nbi): print( 'z_' + str(i+1) + ' = ' + str(z[i].round(int(-np.log10(tol)))) )
+            for i in range(self_LCP.nbi): print( 'w_' + str(i+1) + ' = ' + str(w[i].round(int(-np.log10(tol)))) )
+            print( 'z . w = ' + str((z @ w).round(int(-np.log10(tol)))) )
+        is_sol = all(z >= -tol) and all(w >= -tol) and (abs(z @ w) <= tol)
+        return is_sol
+
+    def bimatrix_game(self):
+        if any(self.Φ_x_y.flatten() <= 0):
+            print('LTU problem with nonpositive outputs.')
+            return
+        a_xy_x = -self.λ_x_y / (self.n_x.reshape(-1, 1) * self.Φ_x_y)
+        b_xy_x = 1/(2 * self.n_x.reshape(-1, 1) * self.Φ_x_y)
+        a_xy_y = -(1-self.λ_x_y) / (self.m_y * self.Φ_x_y)
+        b_xy_y = 1/(2 * self.m_y * self.Φ_x_y)
+        M_X = np.kron( np.eye(self.nbx), np.ones(self.nby).T )
+        M_Y = np.kron( np.ones(self.nbx).T, np.eye(self.nby) )
+        A = np.block([np.diag(a_xy_x.flatten()) @ M_X.T, np.diag(a_xy_y.flatten()) @ M_Y.T])
+        B = np.block([np.diag(b_xy_x.flatten()) @ M_X.T, np.diag(b_xy_y.flatten()) @ M_Y.T])
+        return Bimatrix_game(A, B)
+
+    def solve(self, method='lemke_howson', verbose=1):
+        self_game = self.bimatrix_game()
+        if method == 'lemke_howson':
+            sol_game = self_game.lemke_howson_solve(verbose=verbose)
+        elif method == 'mangasarian_stone':
+            sol_game = self_game.mangasarian_stone_solve()
+        else:
+            print('Method should be either \'lemke_howson\' or \'mangasarian_stone\'')
+            return
+        p_x_y = sol_game['p_i'].reshape((self.nbx, self.nby))
+        q_x = sol_game['q_j'][:self.nbx]
+        q_y = sol_game['q_j'][self.nbx:]
+        μsol = p_x_y / ( 2 * self.Φ_x_y * (sol_game['p_i'] @ self_game.B_i_j @ sol_game['q_j']) )
+        usol = q_x / ( 2 * self.n_x * (sol_game['p_i'] @ (-self_game.A_i_j) @ sol_game['q_j']) )
+        vsol = q_y / ( 2 * self.m_y * (sol_game['p_i'] @ (-self_game.A_i_j) @ sol_game['q_j']) )
+
+        print('Matching matrix:\n', μsol.round(2))
+        print('\nUtilities:')
+        for x in range(self.nbx): print('u_' + str(x+1) + ' = ' + str(usol[x].round(2)))
+        for y in range(self.nby): print('v_' + str(y+1) + ' = ' + str(vsol[y].round(2)))
+        return μsol, usol, vsol
+
+
 
 class TwoBases:
     def __init__(self,Phi_z_a,M_z_a,q_z=None,remove_degeneracies=True,M=None,eps=1e-5):
