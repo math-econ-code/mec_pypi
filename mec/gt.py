@@ -275,6 +275,7 @@ class Bimatrix_game:
                 'val1': α + np.min(self.A_i_j) - 1,
                 'val2': β + np.min(self.B_i_j) - 1}
 
+
 class LTU_problem:
     def __init__(self, Φ_x_y, λ_x_y = None, n_x = None, m_y = None):
         self.Φ_x_y = Φ_x_y
