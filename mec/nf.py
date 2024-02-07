@@ -497,11 +497,8 @@ class Bipartite_EQF_problem:
         arcs_x_y = [(path_x_y[i],path_x_y[i+1]) for i in range(len(path_x_y)-1)]
         flow_x_y = [self.tree[n].flow for n in unique_ancestors_x[::-1]] + [self.tree[n].flow for n in unique_ancestors_y]
         mu_dep, a_dep = min(zip(flow_x_y[::2], arcs_x_y[::2]))
-        if lca[0] == 'x':
-            
-        else:
-            
-        return a_dep
+        newmasses = [mu - mu_dep  * (-1)**i  for (i,mu) in enumerate(flow_x_y)]
+        return a_dep, arcs_x_y + [entering_a], newmasses + [mu_dep] 
 
     #def determine_departing_arc(self, entering_a, basis=None):
     #    entering_k = self.k_a[entering_a]
@@ -511,7 +508,6 @@ class Bipartite_EQF_problem:
     #    else:
     #        departing_a = self.a_k[departing_k]
     #    return (departing_a)
-
 
 
 
@@ -545,7 +541,8 @@ class Bipartite_EQF_problem:
     def iterate(self, draw=False, verbose=0):
         cost_improvement_a = self.cost_improvement_a()
         entering_as = [list(self.digraph.edges())[a] for a in range(self.nba) if cost_improvement_a[a] > 0]
-        print('entering =', entering_as)
+        if verbose>0:
+            print('arbitrable arcs =', entering_as)
         if not entering_as:
             if verbose>0:
                 print('Optimal solution found.\n=======================')
