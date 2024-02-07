@@ -409,11 +409,11 @@ class Bipartite_EQF_problem:
         nx.draw(self.digraph, self.pos, with_labels=False)
 
         if entering_a is not None:
-            nx.draw_networkx_edges(self.digraph, self.pos, edgelist=[entering_a], #edgelist=[self.arcsList[entering_a]],
+            nx.draw_networkx_edges(self.digraph, self.pos, edgelist=[entering_a],
                                    edge_color='green', connectionstyle='arc3,rad=0.3')
 
         if departing_a is not None:
-            nx.draw_networkx_edges(self.digraph, self.pos, edgelist=[departing_a], #edgelist=[self.arcsList[departing_a]],
+            nx.draw_networkx_edges(self.digraph, self.pos, edgelist=[departing_a],
                                    style='dotted', edge_color='white')
 
         q_z = np.concatenate([self.n_x,self.m_y])
@@ -447,18 +447,21 @@ class Bipartite_EQF_problem:
         root_node = current_parent_node
         self.tree = {current_parent: root_node}
         current_parent_node.price = 0
+        current_parent_node.flow = 0
         while (x<self.nbx) & (y<self.nby):
             current_child = ('y'+str(y) if current_parent[0]=='x' else 'x'+str(x))
             current_child_node = Node(name = current_child, parent = current_parent_node)
             current_child_node.price = self.galois_xy[(current_child,current_parent)](current_parent_node.price)
             self.tree[current_child] = current_child_node
             if res_x[x] <= res_y[y]:
+                current_child_node.flow = res_x[x] # (-1)**(current_child[0]=='x') *
                 res_x[x], res_y[y] = 0, res_y[y]-res_x[x]
                 if current_parent[0]=='x':
                     current_parent = 'y'+str(y)
                     current_parent_node = current_child_node
                 x = x+1
             else:
+                current_child_node.flow = res_y[y] # (-1)**(current_child[0]=='x') *
                 res_x[x], res_y[y] = res_x[x]-res_y[y], 0
                 if current_parent[0]=='y':
                     current_parent = 'x'+str(x)
@@ -470,7 +473,7 @@ class Bipartite_EQF_problem:
     
     def display_tree(self):
         for pre, fill, node in RenderTree(self.tree['x0']):
-            print("%s%s%s%s" % (pre, node.name,', p=' , node.price))
+            print("%s%s%s%s%s%s" % (pre, node.name,', p=', node.price, ', μ=' , node.flow))
     
     def create_p_z(self, current_price=0):
         p_z = np.zeros(self.nbz)
@@ -481,6 +484,36 @@ class Bipartite_EQF_problem:
 
     def cost_improvement_a(self):
         return np.array([ self.galois_xy[(x,y)](self.p_z[self.nbx + int(y[1:])]) - self.p_z[int(x[1:])] for (x,y) in self.digraph.edges() ])
+
+    def determine_departing_arc(self, entering_a):
+        x_ent, y_ent = entering_a
+        ancestors_x = [a.name for a in self.tree[x_ent].path]
+        ancestors_y = [a.name for a in self.tree[y_ent].path]
+        common_ancestors = set(ancestors_x) & set(ancestors_y)
+        lca = ancestors_x[len(common_ancestors)-1]
+        unique_ancestors_x = [node for node in ancestors_x if node not in common_ancestors]
+        unique_ancestors_y = [node for node in ancestors_y if node not in common_ancestors]
+        path_x_y = unique_ancestors_x[::-1] + [lca] + unique_ancestors_y
+        arcs_x_y = [(path_x_y[i],path_x_y[i+1]) for i in range(len(path_x_y)-1)]
+        flow_x_y = [self.tree[n].flow for n in unique_ancestors_x[::-1]] + [self.tree[n].flow for n in unique_ancestors_y]
+        mu_dep, a_dep = min(zip(flow_x_y[::2], arcs_x_y[::2]))
+        if lca[0] == 'x':
+            
+        else:
+            
+        return a_dep
+
+    #def determine_departing_arc(self, entering_a, basis=None):
+    #    entering_k = self.k_a[entering_a]
+    #    departing_k = self.tableau.determine_departing(entering_k)
+    #    if departing_k is None:
+    #        departing_a = None
+    #    else:
+    #        departing_a = self.a_k[departing_k]
+    #    return (departing_a)
+
+
+
 
     def cut_pricing_tree(self, departing_a): # returns root of second connected component
         x,y = departing_a
@@ -508,18 +541,9 @@ class Bipartite_EQF_problem:
             z_prec = z
             z = znext
 
-    def determine_departing_arc(self, entering_a, basis=None):
-            entering_k = self.k_a[entering_a]
-        departing_k = self.tableau.determine_departing(entering_k)
-        if departing_k is None:
-            departing_a = None
-        else:
-            departing_a = self.a_k[departing_k]
-        return (departing_a)
-        
+
     def iterate(self, draw=False, verbose=0):
         cost_improvement_a = self.cost_improvement_a()
-        #entering_as = list(self.digraph.edges())[np.where(cost_improvement_a)]
         entering_as = [list(self.digraph.edges())[a] for a in range(self.nba) if cost_improvement_a[a] > 0]
         print('entering =', entering_as)
         if not entering_as:
@@ -532,23 +556,23 @@ class Bipartite_EQF_problem:
         else:
             entering_a = entering_as[0]
             departing_a = self.determine_departing_arc(entering_a)
-            print('entering_a =', entering_a,', departing_a =', departing_a)
+            print('entering_a = ' + str(entering_a) + ', departing_a = ' + str(departing_a))
             if departing_a is None:
                 if verbose>0:
                     print('Unbounded solution.')
                 return 1
             else:
                 if verbose>1:
-                    print('entering=',entering_a)
-                    print('departing=',departing_a)
+                    print('entering =', entering_a)
+                    print('departing =', departing_a)
                 if draw:
                     mu_a,p_z,g_a = self.musol_a(),self.p0sol_z(),self.gain_a()
                     self.draw(p_z = p_z,mu_a=mu_a, gain_a = g_a, entering_a = entering_a, departing_a = departing_a)
                     
                 z_oldroot = self.cut_pricing_tree(departing_a)
                 self.paste_pricing_tree(entering_a,z_oldroot)
-                self.basis.remove(departing_a)
-                self.basis.append(entering_a)
+                #self.basis.remove(departing_a)
+                #self.basis.append(entering_a)
                 return 2
                 
                 
