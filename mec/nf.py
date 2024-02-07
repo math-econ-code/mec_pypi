@@ -486,19 +486,18 @@ class Bipartite_EQF_problem:
         return np.array([ self.galois_xy[(x,y)](self.p_z[self.nbx + int(y[1:])]) - self.p_z[int(x[1:])] for (x,y) in self.digraph.edges() ])
 
     def determine_departing_arc(self, entering_a):
-        x_ent, y_ent = entering_a
-        ancestors_x = [a.name for a in self.tree[x_ent].path]
-        ancestors_y = [a.name for a in self.tree[y_ent].path]
-        common_ancestors = set(ancestors_x) & set(ancestors_y)
-        lca = ancestors_x[len(common_ancestors)-1]
-        unique_ancestors_x = [node for node in ancestors_x if node not in common_ancestors]
-        unique_ancestors_y = [node for node in ancestors_y if node not in common_ancestors]
-        path_x_y = unique_ancestors_x[::-1] + [lca] + unique_ancestors_y
-        arcs_x_y = [(path_x_y[i],path_x_y[i+1]) for i in range(len(path_x_y)-1)]
-        flow_x_y = [self.tree[n].flow for n in unique_ancestors_x[::-1]] + [self.tree[n].flow for n in unique_ancestors_y]
-        mu_dep, a_dep = min(zip(flow_x_y[::2], arcs_x_y[::2]))
-        newmasses = [mu - mu_dep  * (-1)**i  for (i,mu) in enumerate(flow_x_y)]
-        return a_dep, arcs_x_y + [entering_a], newmasses + [mu_dep] 
+        x, y = entering_a
+        ancestors_x = [a.name for a in self.tree[x].path]
+        ancestors_y = [a.name for a in self.tree[y].path]
+        unique_ancestors_x = [node for node in ancestors_x if node not in ancestors_y]
+        unique_ancestors_y = [node for node in ancestors_y if node not in ancestors_x]
+        lca = ancestors_x[len(ancestors_x)-len(unique_ancestors_x)-1]
+        path_x_to_y = unique_ancestors_x[::-1] + [lca] + unique_ancestors_y
+        arcs_x_to_y = [(path_x_y[i],path_x_y[i+1]) for i in range(len(path_x_y)-1)]
+        flow_x_to_y = [self.tree[n].flow for n in unique_ancestors_x[::-1]] + [self.tree[n].flow for n in unique_ancestors_y]
+        departing_mu, departing_a = min(zip(flow_x_y[::2], arcs_x_y[::2]))
+        newflow_x_to_y = [mu - departing_mu  * (-1)**i  for (i, mu) in enumerate(flow_x_y)]
+        return departing_a, arcs_x_y + [entering_a], newflow_x_y + [departing_mu], lca
 
     #def determine_departing_arc(self, entering_a, basis=None):
     #    entering_k = self.k_a[entering_a]
