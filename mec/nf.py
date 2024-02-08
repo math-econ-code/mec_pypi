@@ -497,25 +497,24 @@ class Bipartite_EQF_problem:
         flow_x_to_y = [self.tree[n].flow for n in unique_ancestors_x[::-1]] + [self.tree[n].flow for n in unique_ancestors_y]
         departing_mu, departing_a = min(zip(flow_x_y[::2], arcs_x_y[::2]))
         newflow_x_to_y = [mu - departing_mu  * (-1)**i  for (i, mu) in enumerate(flow_x_y)]
+        x_dep, y_dep = departing_a
         return departing_a, arcs_x_y + [entering_a], newflow_x_y + [departing_mu], lca
 
-    #def determine_departing_arc(self, entering_a, basis=None):
-    #    entering_k = self.k_a[entering_a]
-    #    departing_k = self.tableau.determine_departing(entering_k)
-    #    if departing_k is None:
-    #        departing_a = None
-    #    else:
-    #        departing_a = self.a_k[departing_k]
-    #    return (departing_a)
-
-
-
-    def cut_pricing_tree(self, departing_a): # returns root of second connected component
-        x,y = departing_a
-        if (self.tree[y].parent == self.tree[x]):
-            return y
-        elif (self.tree[x].parent == self.tree[y]):
-            return x
+    def cut_pricing_tree(self, entering_a, departing_a, departing_mu): # returns root of second connected component
+        x_dep,y_dep = departing_a
+        x_ent,y_ent = entering_a
+        if (self.tree[x_dep].parent == self.tree[y_dep]):
+            for i,z in enumerate(self.tree[y_dep].path[1:]):
+                z.flow += (-1)**i * departing_mu
+            for i,z in enumerate(self.tree[y_ent].path[1:]):
+                z.flow += (-1)**(i+1) * departing_mu
+            return x_dep
+        elif (self.tree[y_dep].parent == self.tree[x_dep]):
+            for i,z in enumerate(self.tree[x_ent].path[1:]):
+                z.flow += (-1)**i * departing_mu
+            for i,z in enumerate(self.tree[x_dep].path[1:]):
+                z.flow += (-1)**(i+1) * departing_mu
+            return y_dep
         else:
             print('Error in pricing tree during cut phase.')
     
@@ -530,11 +529,11 @@ class Bipartite_EQF_problem:
             return
         
         z = z_newroot
-        while (z_prec != z_oldroot):
-            znext = self.tree[z].parent.name
+        while (z_prec != z_oldroot): # here we should also update new flows
+            z_next = self.tree[z].parent.name
             self.tree[z].parent = self.tree[z_prec]
             z_prec = z
-            z = znext
+            z = z_next
 
 
     def iterate(self, draw=False, verbose=0):
