@@ -346,7 +346,6 @@ class EQF_problem:
             z = znext
     
     def iterate(self,  draw = False, verbose=0):
-    
         p_z = self.psol_z()
         cost_improvement_a = np.array([self.galois_xy[(x,y)] (p_z[self.nodesDict[y]]) - p_z[self.nodesDict[x]] for (x,y) in self.arcsList])
         entering_as = np.where(cost_improvement_a )[0].tolist() 
@@ -392,6 +391,7 @@ class Bipartite_EQF_problem:
         self.nba = self.nbx*self.nby
         self.galois_xy = galois_xy
         self.label_galois_xy = label_galois_xy
+        self.p_z = np.zeros(self.nbz)
         
         self.digraph = nx.DiGraph()
         self.digraph.add_nodes_from(['x'+str(x) for x in range(self.nbx)], bipartite=0)
@@ -402,8 +402,8 @@ class Bipartite_EQF_problem:
         self.pos.update((node, (1, index)) for index, node in enumerate(bottom_nodes))  # Set one side for one set
         self.pos.update((node, (2, index)) for index, node in enumerate(top_nodes))
 
-        self.create_pricing_tree()
-        self.create_p_z()
+        self.create_tree()
+        self.update_p_z()
    
     def draw(self, draw_prices=False, mu_a=None, plot_galois=False, entering_a=None, departing_a=None, gain_a=None, figsize=(50, 30)):
         nx.draw(self.digraph, self.pos, with_labels=False)
@@ -439,11 +439,11 @@ class Bipartite_EQF_problem:
         plt.figure(figsize=figsize)
         plt.show()
 
-    def create_pricing_tree(self, display_tree=False):
+    def create_tree(self, display_tree=False):
         x,y=0,0
         res_x,res_y = self.n_x.copy(),self.m_y.copy()
         current_parent = 'x'+str(x)
-        current_parent_node = Node(name = current_parent, parent = None)
+        current_parent_node = Node(name=current_parent, parent=None)
         root_node = current_parent_node
         self.tree = {current_parent: root_node}
         current_parent_node.price = 0
@@ -475,99 +475,134 @@ class Bipartite_EQF_problem:
         for pre, fill, node in RenderTree(self.tree['x0']):
             print("%s%s%s%s%s%s" % (pre, node.name,', p=', node.price, ', μ=' , node.flow))
     
-    def create_p_z(self, current_price=0):
-        p_z = np.zeros(self.nbz)
+    def update_p_z(self, current_price=0):
         for z in range(self.nbz):
-            p_z[z] = self.tree[list(self.digraph.nodes())[z]].price
-        self.p_z = p_z
-        return p_z
+            self.p_z[z] = self.tree[list(self.digraph.nodes())[z]].price
+        return self.p_z
 
     def cost_improvement_a(self):
         return np.array([ self.galois_xy[(x,y)](self.p_z[self.nbx + int(y[1:])]) - self.p_z[int(x[1:])] for (x,y) in self.digraph.edges() ])
 
+    def determine_entering_arc(self, verbose=0):
+        cost_improvement_a = self.cost_improvement_a()
+        entering_as = [list(self.digraph.edges())[a] for a in range(self.nba) if cost_improvement_a[a] > 0]
+        if verbose>0:
+            print('arbitrable arcs =', entering_as)
+        if not entering_as:
+            return None
+        else:
+            return entering_as[0]
+
     def determine_departing_arc(self, entering_a):
-        x, y = entering_a
+        x,y = entering_a
         ancestors_x = [a.name for a in self.tree[x].path]
         ancestors_y = [a.name for a in self.tree[y].path]
         unique_ancestors_x = [node for node in ancestors_x if node not in ancestors_y]
         unique_ancestors_y = [node for node in ancestors_y if node not in ancestors_x]
         lca = ancestors_x[len(ancestors_x)-len(unique_ancestors_x)-1]
         path_x_to_y = unique_ancestors_x[::-1] + [lca] + unique_ancestors_y
-        arcs_x_to_y = [(path_x_y[i],path_x_y[i+1]) for i in range(len(path_x_y)-1)]
+        arcs_x_to_y = [(path_x_to_y[i],path_x_to_y[i+1]) for i in range(len(path_x_to_y)-1)]
         flow_x_to_y = [self.tree[n].flow for n in unique_ancestors_x[::-1]] + [self.tree[n].flow for n in unique_ancestors_y]
-        departing_mu, departing_a = min(zip(flow_x_y[::2], arcs_x_y[::2]))
-        newflow_x_to_y = [mu - departing_mu  * (-1)**i  for (i, mu) in enumerate(flow_x_y)]
-        x_dep, y_dep = departing_a
-        return departing_a, arcs_x_y + [entering_a], newflow_x_y + [departing_mu], lca
+        departing_mu, departing_a = min(zip(flow_x_to_y[::2], arcs_x_to_y[::2]))
+        return departing_a, departing_mu
 
-    def cut_pricing_tree(self, entering_a, departing_a, departing_mu): # returns root of second connected component
-        x_dep,y_dep = departing_a
-        x_ent,y_ent = entering_a
-        if (self.tree[x_dep].parent == self.tree[y_dep]):
-            for i,z in enumerate(self.tree[y_dep].path[1:]):
-                z.flow += (-1)**i * departing_mu
-            for i,z in enumerate(self.tree[y_ent].path[1:]):
-                z.flow += (-1)**(i+1) * departing_mu
-            return x_dep
-        elif (self.tree[y_dep].parent == self.tree[x_dep]):
-            for i,z in enumerate(self.tree[x_ent].path[1:]):
-                z.flow += (-1)**i * departing_mu
-            for i,z in enumerate(self.tree[x_dep].path[1:]):
-                z.flow += (-1)**(i+1) * departing_mu
-            return y_dep
+
+    def update_tree(self, entering_a, departing_a, departing_mu):
+        x,y = departing_a
+        if self.tree[x].parent == self.tree[y]:
+            z_oldroot = x
+        elif self.tree[y].parent == self.tree[x]:
+            z_oldroot = y
         else:
             print('Error in pricing tree during cut phase.')
-    
-    def paste_pricing_tree(self, entering_a, z_oldroot):
+            return
+
         x,y = entering_a
-        if (self.tree[z_oldroot] in self.tree[y].ancestors):
+        print(z_oldroot)
+        if self.tree[z_oldroot] in self.tree[y].path:
             z_newroot, z_prec = y,x
-        elif (self.tree[z_oldroot] in self.tree[x].ancestors):
+        elif self.tree[z_oldroot] in self.tree[x].path:
             z_newroot, z_prec = x,y
         else:
             print('Error in pricing tree during paste phase.')
             return
-        
+
+        for i,z in enumerate(self.tree[x].path[1:]): # can be part of determine_departing_arc
+            z.flow += (-1)**i * departing_mu
+        for i,z in enumerate(self.tree[y].path[1:]):
+            z.flow += (-1)**(i+1) * departing_mu
+
         z = z_newroot
-        while (z_prec != z_oldroot): # here we should also update new flows
+        while z_prec != z_oldroot:
             z_next = self.tree[z].parent.name
             self.tree[z].parent = self.tree[z_prec]
             z_prec = z
             z = z_next
 
+        z = z_oldroot
+        while z != z_newroot:
+            self.tree[z].flow = self.tree[z].parent.flow
+            z = self.tree[z].parent.name
+        self.tree[z_newroot].flow = departing_mu
+
+        new_price = self.galois_xy[(z_newroot,self.tree[z_newroot].parent.name)](self.tree[z_newroot].parent.price)
+        self.set_prices_r(z_newroot, new_price)
+
+
+    def cut_pricing_tree(self, departing_a): # returns root of second connected component
+        x,y = departing_a
+        if self.tree[x].parent == self.tree[y]:
+            return x
+        elif self.tree[y].parent == self.tree[x]:
+            return y
+        else:
+            print('Error in pricing tree during cut phase.')
+    
+    def paste_pricing_tree(self, entering_a, z_oldroot, departing_mu):
+        x,y = entering_a
+        if self.tree[z_oldroot] in self.tree[y].ancestors:
+            z_newroot, z_prec = y,x
+        elif self.tree[z_oldroot] in self.tree[x].ancestors:
+            z_newroot, z_prec = x,y
+        else:
+            print('Error in pricing tree during paste phase.')
+            return
+
+        z = z_newroot
+        while z_prec != z_oldroot:
+            z_next = self.tree[z].parent.name
+            self.tree[z].parent = self.tree[z_prec]
+            z_prec = z
+            z = z_next
+
+        z = z_oldroot
+        while z != z_newroot:
+            self.tree[z].flow = self.tree[z].parent.flow
+            z = self.tree[z].parent.name
+        self.tree[z_newroot].flow = departing_mu
 
     def iterate(self, draw=False, verbose=0):
         cost_improvement_a = self.cost_improvement_a()
-        entering_as = [list(self.digraph.edges())[a] for a in range(self.nba) if cost_improvement_a[a] > 0]
-        if verbose>0:
-            print('arbitrable arcs =', entering_as)
-        if not entering_as:
+        entering_a = self.determine_entering_arc(verbose=verbose-1)
+        if entering_a is None:
             if verbose>0:
                 print('Optimal solution found.\n=======================')
-            #if draw:
-            #    mu_a,p_z,g_a = self.musol_a(),self.p0sol_z(),self.gain_a()
-            #    self.draw(p_z = p_z,mu_a=mu_a)
             return 0
         else:
-            entering_a = entering_as[0]
-            departing_a = self.determine_departing_arc(entering_a)
-            print('entering_a = ' + str(entering_a) + ', departing_a = ' + str(departing_a))
+            departing_a, departing_mu = self.determine_departing_arc(entering_a)
+            if verbose>1:
+                print(str(entering_a) + ' enters, ' + str(departing_a) + ' departs')
             if departing_a is None:
                 if verbose>0:
                     print('Unbounded solution.')
                 return 1
             else:
-                if verbose>1:
-                    print('entering =', entering_a)
-                    print('departing =', departing_a)
-                if draw:
-                    mu_a,p_z,g_a = self.musol_a(),self.p0sol_z(),self.gain_a()
-                    self.draw(p_z = p_z,mu_a=mu_a, gain_a = g_a, entering_a = entering_a, departing_a = departing_a)
-                    
-                z_oldroot = self.cut_pricing_tree(departing_a)
-                self.paste_pricing_tree(entering_a,z_oldroot)
-                #self.basis.remove(departing_a)
-                #self.basis.append(entering_a)
+                self.update_tree(entering_a, departing_a, departing_mu)
+                self.update_p_z()
                 return 2
-                
-                
+
+    def set_prices_r(self, z, current_price=0):
+        self.tree[z].price = current_price
+        for child in self.tree[z].children:
+            self.set_prices_r(child.name, self.galois_xy[(child.name,z)](current_price))
+
