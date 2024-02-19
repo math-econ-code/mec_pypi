@@ -384,7 +384,7 @@ class EQF_problem:
 ##################################################################
                 
 class Bipartite_EQF_problem:
-    def __init__(self, n_x, m_y, galois_xy, label_galois_xy=None, seed=777, verbose=0):
+    def __init__(self, n_x, m_y, galois_xy, label_galois_xy=None, verbose=0):
         self.n_x,self.m_y = n_x,m_y
         self.nbx,self.nby = len(n_x),len(m_y)
         self.nbz = self.nbx + self.nby
@@ -483,11 +483,12 @@ class Bipartite_EQF_problem:
     def cost_improvement_a(self):
         return np.array([ self.galois_xy[(x,y)](self.p_z[self.nbx + int(y[1:])]) - self.p_z[int(x[1:])] for (x,y) in self.digraph.edges() ])
 
-    def determine_entering_arc(self, verbose=0):
+    def determine_entering_arc(self, tol=1e-5, verbose=0):
         cost_improvement_a = self.cost_improvement_a()
-        entering_as = [list(self.digraph.edges())[a] for a in range(self.nba) if cost_improvement_a[a] > 0]
+        entering_as = [list(self.digraph.edges())[a] for a in range(self.nba) if cost_improvement_a[a] > tol]
+        #entering_as = [(x,y) for (x,y) in self.digraph.edges() if self.p_z[int(x[1:]) < self.galois_xy[(x,y)](self.p_z[self.nbx + int(y[1:])])]
         if verbose>0:
-            print('arbitrable arcs =', entering_as)
+            print('Arbitrable arcs:', entering_as)
         if not entering_as:
             return None
         else:
@@ -518,7 +519,7 @@ class Bipartite_EQF_problem:
             return
 
         x,y = entering_a
-        print(z_oldroot)
+        #print(z_oldroot)
         if self.tree[z_oldroot] in self.tree[y].path:
             z_newroot, z_prec = y,x
         elif self.tree[z_oldroot] in self.tree[x].path:
@@ -583,7 +584,7 @@ class Bipartite_EQF_problem:
 
     def iterate(self, draw=False, verbose=0):
         cost_improvement_a = self.cost_improvement_a()
-        entering_a = self.determine_entering_arc(verbose=verbose-1)
+        entering_a = self.determine_entering_arc(verbose=verbose-2)
         if entering_a is None:
             if verbose>0:
                 print('Optimal solution found.\n=======================')
