@@ -384,7 +384,7 @@ class EQF_problem:
 ##################################################################
                 
 class Bipartite_EQF_problem:
-    def __init__(self, n_x, m_y, galois_xy, label_galois_xy=None, verbose=0):
+    def __init__(self, n_x, m_y, galois_xy, label_galois_xy=None, y_root=False, verbose=0):
         self.n_x,self.m_y = n_x,m_y
         self.nbx,self.nby = len(n_x),len(m_y)
         self.nbz = self.nbx + self.nby
@@ -402,8 +402,23 @@ class Bipartite_EQF_problem:
         self.pos.update((node, (1, index)) for index, node in enumerate(bottom_nodes))  # Set one side for one set
         self.pos.update((node, (2, index)) for index, node in enumerate(top_nodes))
 
-        self.create_tree()
+        self.create_tree(y_root=y_root)
         self.update_p_z()
+
+    def add_x_node(self, mass):
+        self.n_x[0] -= mass
+        self.n_x = np.append(self.n_x, mass)
+        self.nbx += 1
+        self.nbz += 1
+        self.nba = self.nbx*self.nby
+        self.p_z = np.append(self.p_z, np.nan)
+        self.digraph.add_nodes_from(['x'+str(len(self.n_x)-1)], bipartite=0)
+        self.digraph.add_edges_from([('x'+str(len(self.n_x)-1),'y'+str(y)) for y in range(self.nby)])
+        bottom_nodes, top_nodes = nx.bipartite.sets(self.digraph)
+        self.pos = {}
+        self.pos.update((node, (1, index)) for index, node in enumerate(bottom_nodes))  # Set one side for one set
+        self.pos.update((node, (2, index)) for index, node in enumerate(top_nodes))
+
    
     def draw(self, draw_prices=False, mu_a=None, plot_galois=False, entering_a=None, departing_a=None, gain_a=None, figsize=(50, 30)):
         nx.draw(self.digraph, self.pos, with_labels=False)
@@ -439,10 +454,13 @@ class Bipartite_EQF_problem:
         plt.figure(figsize=figsize)
         plt.show()
 
-    def create_tree(self, display_tree=False):
+    def create_tree(self, y_root=False, display_tree=False):
         x,y=0,0
         res_x,res_y = self.n_x.copy(),self.m_y.copy()
-        current_parent = 'x'+str(x)
+        if y_root:
+            current_parent = 'y'+str(y)
+        else:
+            current_parent = 'x'+str(x)
         current_parent_node = Node(name=current_parent, parent=None)
         root_node = current_parent_node
         self.tree = {current_parent: root_node}
@@ -472,7 +490,7 @@ class Bipartite_EQF_problem:
         return root_node
     
     def display_tree(self):
-        for pre, fill, node in RenderTree(self.tree['x0']):
+        for pre, fill, node in RenderTree(self.tree['x0'].root):
             print("%s%s%s%s%s%s" % (pre, node.name,', p=', node.price, ', μ=' , node.flow))
     
     def update_p_z(self, current_price=0):
