@@ -417,9 +417,9 @@ class Bipartite_EQF_problem:
                                    style='dotted', edge_color='white')
 
         q_z = np.concatenate([self.n_x,self.m_y])
-        labels = {z: f"{ ('n'*self.nbx+ 'm'*self.nby)[k]}={q_z[k]:.0f}"+'\n'+z+'\n' for k,z in enumerate(self.digraph.nodes()) }
+        labels = {z: f"{ ('n'*self.nbx + 'm'*self.nby)[k]}={q_z[k]:.2f}"+'\n'+z+'\n' for k,z in enumerate(self.digraph.nodes()) }
         if draw_prices:
-            labels = {z: labels[z] + f"p={self.p_z[k]:.0f}" for k,z in enumerate(self.digraph.nodes())}
+            labels = {z: labels[z] + f"p={self.p_z[k]:.2f}" for k,z in enumerate(self.digraph.nodes())}
         nx.draw_networkx_labels(self.digraph, self.pos, labels,font_size=10,verticalalignment = 'center')
 
         edge_labels = {e: '' for e in self.digraph.edges()}
