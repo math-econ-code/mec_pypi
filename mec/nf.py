@@ -384,7 +384,7 @@ class EQF_problem:
 ##################################################################
                 
 class Bipartite_EQF_problem:
-    def __init__(self, n_x, m_y, galois_xy, label_galois_xy=None, y_root=False, verbose=0):
+    def __init__(self, n_x, m_y, galois_xy, label_galois_xy=None, label_galois_yx=None, y_root=False, verbose=0):
         self.n_x,self.m_y = n_x,m_y
         self.nbx,self.nby = len(n_x),len(m_y)
         self.nbz = self.nbx + self.nby
@@ -411,7 +411,7 @@ class Bipartite_EQF_problem:
         self.nbx += 1
         self.nbz += 1
         self.nba = self.nbx*self.nby
-        self.p_z = np.append(self.p_z, np.nan)
+        #self.p_z = np.append(self.p_z, np.nan)
         self.digraph.add_nodes_from(['x'+str(len(self.n_x)-1)], bipartite=0)
         self.digraph.add_edges_from([('x'+str(len(self.n_x)-1),'y'+str(y)) for y in range(self.nby)])
         bottom_nodes, top_nodes = nx.bipartite.sets(self.digraph)
@@ -419,6 +419,25 @@ class Bipartite_EQF_problem:
         self.pos.update((node, (1, index)) for index, node in enumerate(bottom_nodes))  # Set one side for one set
         self.pos.update((node, (2, index)) for index, node in enumerate(top_nodes))
 
+    def add_y_node(self, mass):
+        y_ent = self.nby
+        new_y = 'y' + str(y_ent)
+        self.m_y[0] -= mass
+        self.m_y = np.append(self.m_y, mass)
+        self.nby += 1
+        self.nbz += 1
+        self.nba = self.nbx*self.nby
+        self.p_z = np.append(self.p_z, -np.inf)
+        self.digraph.add_nodes_from(['y'+str(y_ent)], bipartite=1)
+        self.digraph.add_edges_from([('x'+str(x), 'y'+str(y_ent)) for x in range(self.nbx)])
+        bottom_nodes, top_nodes = nx.bipartite.sets(self.digraph)
+        self.pos = {}
+        self.pos.update((node, (1, index)) for index, node in enumerate(bottom_nodes))  # Set one side for one set
+        self.pos.update((node, (2, index)) for index, node in enumerate(top_nodes))
+        new_node = Node(name = new_y, parent = self.tree['y0'])
+        self.tree[new_y] = new_node
+        self.tree[new_y].flow = self.m_y[y_ent]
+        self.tree[new_y].price = self.p_z[-1]
    
     def draw(self, draw_prices=False, mu_a=None, plot_galois=False, entering_a=None, departing_a=None, gain_a=None, figsize=(50, 30)):
         nx.draw(self.digraph, self.pos, with_labels=False)
@@ -438,9 +457,13 @@ class Bipartite_EQF_problem:
         nx.draw_networkx_labels(self.digraph, self.pos, labels,font_size=10,verticalalignment = 'center')
 
         edge_labels = {e: '' for e in self.digraph.edges()}
-        if plot_galois:
+        if plot_galois==1:
             for e in self.digraph.edges():
                 edge_labels[e] += self.label_galois_xy[e]
+        if plot_galois==-1:
+            for e in self.digraph.edges():
+                (x, y) = e
+                edge_labels[e] += self.label_galois_xy[(y,x)]
         #if mu_a is not None:
         #    for (i,e) in enumerate(self.digraph.edges()):
         #        if i in self.basis():
@@ -524,6 +547,171 @@ class Bipartite_EQF_problem:
         flow_x_to_y = [self.tree[n].flow for n in unique_ancestors_x[::-1]] + [self.tree[n].flow for n in unique_ancestors_y]
         departing_mu, departing_a = min(zip(flow_x_to_y[::2], arcs_x_to_y[::2]))
         return departing_a, departing_mu
+
+    def determine_departing_arc_alt(self, y_ent, entering_a):
+        x,y = entering_a
+        ancestors_x = [a.name for a in self.tree[x].path]
+        ancestors_y = [a.name for a in self.tree[y].path]
+        unique_ancestors_x = [node for node in ancestors_x if node not in ancestors_y]
+        lca = ancestors_x[len(ancestors_x)-len(unique_ancestors_x)-1]
+        if lca != 'y0':
+            return self.determine_departing_arc(entering_a)
+        arcs_y0_to_x = [(ancestors_x[i],ancestors_x[i+1]) for i in range(len(ancestors_x)-1)]
+        flow_y0_to_x = [self.tree[n].flow for n in ancestors_x[1:]]
+        departing_mu_x, departing_a_x = min(zip(flow_y0_to_x[::2], arcs_y0_to_x[::2]))
+        arcs_y0_to_y = [(ancestors_y[i],ancestors_y[i+1]) for i in range(len(ancestors_y)-1)]
+        flow_y0_to_y = [self.tree[n].flow for n in ancestors_y[1:]]
+        departing_mu_y, departing_a_y = min(zip(flow_y0_to_y[::2], arcs_y0_to_y[::2]))
+        if departing_mu_x < departing_mu_y:
+            return departing_a_x, departing_mu_x
+        else:
+            return departing_a_y, departing_mu_y
+
+    def makelist_x_fixed_tree(self, node, y_ent, list_x_fixed_tree):
+        if 'x' in node.name:
+            list_x_fixed_tree.append(node.name)
+        for child in node.children:
+            if child.name != 'y'+str(y_ent):
+                self.makelist_x_fixed_tree(child, y_ent, list_x_fixed_tree)
+        return list_x_fixed_tree
+
+    def find_price_increase_old(self, node, x_fixed_tree):
+        list = []
+        for child in node.children:
+            x, y, p = self.find_price_increase(child, x_fixed_tree)
+            list.append((x, y, self.galois_xy[node.name, child.name](p)))
+        if 'y' in node.name:
+            for x in x_fixed_tree:
+                list.append((x, node.name, self.galois_xy[node.name, x](self.tree[x].price)))
+        if list == []:
+            return node.name, 'y0', np.inf
+        return min(list, key=lambda item: item[2])
+
+    def find_price_increase(self, node):
+        list = []
+        for child in node.children:
+            x, y, p = self.find_price_increase(child)
+            list.append((x, y, self.galois_xy[node.name, child.name](p)))
+        if 'y' in node.name:
+            for x in range(self.nbx):
+                x_name = "x"+str(x)
+                if (node.parent.name != x_name) & (self.tree[x_name].parent != node):
+                    list.append((x_name, node.name, self.galois_xy[node.name, x_name](self.tree[x_name].price)))
+        #if 'x' in node.name:
+        #    for y in range(self.nby):
+        #        y_name = "y"+str(y)
+        #        if (node.parent.name != y_name) & (self.tree[y_name].parent != node):
+        #            list.append((node.name, y_name, self.galois_xy[node.name, y_name](self.tree[y_name].price)))
+        if list == []:
+            return node.name, 'y0', np.inf
+        return min(list, key=lambda item: item[2])
+
+    def increase_prices(self, node, p):
+        node.price = p
+        for child in node.children:
+            self.increase_prices(child, self.galois_xy[child.name, node.name](p))
+
+    def determine_entering_arc_alt(self, y_ent):
+        #list_x_fixed_tree = self.makelist_x_fixed_tree(self.tree['y0'], y_ent, [])
+        x, y, p = self.find_price_increase(self.tree['y'+str(y_ent)])
+        if p >= self.tree['y'+str(y_ent)].price:
+            self.increase_prices(self.tree['y'+str(y_ent)], p)
+            self.update_p_z()
+        return x, y
+
+    def iterate_alt(self, y_ent, mass, verbose = 0):
+        self.add_y_node(mass)
+        departing_a = None
+        if verbose > 1: self.display_tree()
+        while departing_a != ('y0', 'y'+str(y_ent)):
+            entering_a = self.determine_entering_arc_alt(y_ent)
+            if verbose > 0:
+                print("=========================")
+                print("Entering arc:", entering_a)
+            departing_a, departing_mu = self.determine_departing_arc_alt(y_ent, entering_a)
+            if verbose > 0:
+                print("Departing arc:", departing_a)
+                print("Departing mass:", departing_mu)
+                if verbose > 1:
+                    self.excess_inflow()
+                    self.excess_outflow()
+            x, y = entering_a
+            if (y in [a.name for a in self.tree[x].path]) or (x in [a.name for a in self.tree[y].path]):
+                self.update_tree(entering_a, departing_a, departing_mu)
+            else:
+                self.update_tree_alt(entering_a, departing_a, departing_mu)
+            if verbose > 1:
+                self.display_tree()
+
+    def algo_alt(self, m_y):
+        y_ent = 1
+        while y_ent < len(m_y):
+            self.iterate_alt(y_ent, m_y[y_ent])
+            y_ent += 1
+
+    def update_tree_alt(self, entering_a, departing_a, departing_mu):
+        x,y = departing_a
+        if self.tree[x].parent == self.tree[y]:
+            z_oldroot = x
+        elif self.tree[y].parent == self.tree[x]:
+            z_oldroot = y
+        else:
+            print('Error in pricing tree during cut phase.')
+            return
+
+        x,y = entering_a
+        #print(z_oldroot)
+        if self.tree[z_oldroot] in self.tree[y].path:
+            z_newroot, z_prec = y,x
+        elif self.tree[z_oldroot] in self.tree[x].path:
+            z_newroot, z_prec = x,y
+        else:
+            print('Error in pricing tree during paste phase.')
+            return
+
+        for i,z in enumerate(self.tree[x].path[1:]): # can be part of determine_departing_arc
+            z.flow += (-1)**(i+1) * departing_mu
+        for i,z in enumerate(self.tree[y].path[1:]):
+            z.flow += (-1)**(i+1) * departing_mu
+
+        z = z_newroot
+        while z_prec != z_oldroot:
+            z_next = self.tree[z].parent.name
+            self.tree[z].parent = self.tree[z_prec]
+            z_prec = z
+            z = z_next
+
+        z = z_oldroot
+        while z != z_newroot:
+            self.tree[z].flow = self.tree[z].parent.flow
+            z = self.tree[z].parent.name
+        self.tree[z_newroot].flow = departing_mu
+
+        new_price = self.galois_xy[(z_newroot,self.tree[z_newroot].parent.name)](self.tree[z_newroot].parent.price)
+        self.set_prices_r(z_newroot, new_price)
+
+    def excess_inflow(self):
+        print("Excess inflow:")
+        for y in range(self.nby):
+            y_name = 'y'+str(y)
+            inflow = self.tree[y_name].flow
+            for child in self.tree[y_name].children:
+                if 'y' in child.name:
+                    inflow -= child.flow
+                else:
+                    inflow += child.flow
+            net_flow = inflow - self.m_y[y]
+            print("y" + str(y) + " : " + str(net_flow))
+
+    def excess_outflow(self):
+        print("Excess outflow:")
+        for x in range(self.nbx):
+            x_name = 'x'+str(x)
+            outflow = self.tree[x_name].flow
+            for child in self.tree[x_name].children:
+                outflow += child.flow
+            net_flow = outflow - self.n_x[x]
+            print("x" + str(x) + " : " + str(net_flow))
 
 
     def update_tree(self, entering_a, departing_a, departing_mu):
