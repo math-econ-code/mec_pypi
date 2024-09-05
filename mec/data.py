@@ -70,6 +70,16 @@ def load_ChooSiow_data(nbCateg = 25):
              }) 
 
 def load_Rust_data():
+    """
+    Returns dynamic discrete choice data based on Rust's (Econometrica 1987) original dataset
+
+    output:
+        a three column array whose:
+         - first column is the milage range (per 5,000 miles brackets)
+         - second column is the decision to replace (1) or not (0)
+         - third column is number of additional mileage brackets after running one period 
+
+    """
     thepath = pkg_resources.resource_filename('mec', 'datasets/dynamicchoice_Rust/')
     def getcleandata(name,nrow):
         filepath = thepath+name+'.asc'
