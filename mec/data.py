@@ -83,7 +83,7 @@ def load_Rust_data():
     thepath = pkg_resources.resource_filename('mec', 'datasets/dynamicchoice_Rust/')
     def getcleandata(name,nrow):
         filepath = thepath+name+'.asc'
-        thearray =  pd.read_csv( filepath, delim_whitespace=True, header=None).to_numpy().reshape((nrow, -1), order='F')
+        thearray =  pd.read_csv( filepath, sep='\s+', header=None).to_numpy().reshape((nrow, -1), order='F')
         odometer1 = thearray[5, :]  # mileage at first replacement (0 if no replacement)
         odometer2 = thearray[8, :]  # mileage at second replacement (0 if no replacement)
 
