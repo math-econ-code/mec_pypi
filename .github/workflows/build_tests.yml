@@ -44,6 +44,6 @@ jobs:
         skip_existing: true
       run: python -m twine upload --skip-existing --verbose dist/*        
       
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v3
       with:
         path: ./dist/*.whl
