@@ -106,3 +106,11 @@ def load_Rust_data():
     return np.vstack([getcleandata(name,nrow) for (name, nrow) in [ ('g870',36),('rt50',60),('t8h203',81),('a530875',128) ]])
 
 
+def load_blp_data()
+    """
+    Returns the data used by Berry, Levinsohn and Pakes (2005)
+    
+    output:
+        two pandas
+    """
+    thepath = pkg_resources.resource_filename('mec', 'datasets/demand_blp/pyblp/')
