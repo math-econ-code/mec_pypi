@@ -146,7 +146,7 @@ def load_blp_data(pyblp_compatibility=True):
         'ci'          # ci: captive imports against the voluntary export restraint (ver)
     ]
     # load data files
-    maindf = pd.read_csv(thepath+'panel6.asc', sep='\s+', names=column_names, header=None)
+    prods = pd.read_csv(thepath+'panel6.asc', sep='\s+', names=column_names, header=None)
     otherdf = pd.read_csv( thepath + 'otherdat.asc', 
                           sep='\s+', 
                           names= ['year','size', 'meanly' ,'cpi' ,'gasprice', 'rmat1','rmat2', 
@@ -156,8 +156,10 @@ def load_blp_data(pyblp_compatibility=True):
                            sep='\s+', 
                            names= ['year','size', 'meanly' ,'cpi' ,'gasprice', 'rmat1','rmat2', 
                                    'nvec','uswage','gwage','jwage','dm', 'yen', 'gnp' , 'primer'],
-                           header=None)
+                           header=None).head(20)
     erates = pd.read_csv( thepath + 'lagged_erate.asc', sep='\s+', names=['yenlag','dmlag'] ,header=None)
+
+    unobs = pd.read_csv(the_path+'../gentzkow-shapiro/unobs_pub.csv').dropna(axis=1, how='all')
     
     # define a function to load instruments
     def create_blp_instruments(df, theseries):
@@ -175,43 +177,43 @@ def load_blp_data(pyblp_compatibility=True):
         return np.array(thelist).T
     
     # convert 1990 displacement from liters to cubic inches
-    maindf.loc[maindf['market_ids'] == 90, 'disp'] = maindf.loc[maindf['market_ids'] == 90, 'disp'] * 61.02
+    prods.loc[prods['market_ids'] == 90, 'disp'] = prods.loc[prods['market_ids'] == 90, 'disp'] * 61.02
     #
     # compute mile per dollar = mile per gallon / dollar per gallon
     adjustment_dic = {otherdf['year'][i]: otherdf['cpi'][i] /( 100*  otherdf['gasprice'][i] ) for i,_ in otherdf.iterrows() }
-    mpd = np.array([maindf['mpg'][i] * adjustment_dic[maindf['market_ids'][i]] / 10 for i,_ in maindf.iterrows() ])
-    maindf['mpd'] = mpd
+    mpd = np.array([prods['mpg'][i] * adjustment_dic[prods['market_ids'][i]] / 10 for i,_ in prods.iterrows() ])
+    prods['mpd'] = mpd
     #
     otherdf3['yenlag'] = erates['yenlag']
     otherdf3['dmlag'] = erates['dmlag']
     #
     # create market shares
     size_dic =  {otherdf3['year'][i]: otherdf3['size'][i]  for i,_ in otherdf3.iterrows() }
-    maindf['shares'] = np.array([maindf['sales'][i] / size_dic[maindf['market_ids'][i]] / 1000 for i,_ in maindf.iterrows() ])
+    prods['shares'] = np.array([prods['sales'][i] / size_dic[prods['market_ids'][i]] / 1000 for i,_ in prods.iterrows() ])
 
     # deflate prices and rescale various quantities
     cpi_dic = {otherdf['year'][i]: otherdf['cpi'][i] for i,_ in otherdf.iterrows() }
-    maindf['prices'] = [maindf['prices'][i] / (cpi_dic[maindf['market_ids'][i]] / 100) / 1000 for i,_ in maindf.iterrows() ]
-    maindf['sales'] = maindf['sales'] / 1000
-    maindf['wght'] =maindf['wght'] / 1000
-    maindf['hp'] =maindf['hp'] / 100
-    maindf['disp'] =maindf['disp'] / 100
-    maindf['lngth'] =maindf['lngth'] / 100
-    maindf['wdth'] =maindf['wdth'] / 100
-    maindf['wb'] =maindf['wb'] / 100
-    maindf['mpg'] =maindf['mpg'] / 10
+    prods['prices'] = [prods['prices'][i] / (cpi_dic[prods['market_ids'][i]] / 100) / 1000 for i,_ in prods.iterrows() ]
+    prods['sales'] = prods['sales'] / 1000
+    prods['wght'] =prods['wght'] / 1000
+    prods['hp'] =prods['hp'] / 100
+    prods['disp'] =prods['disp'] / 100
+    prods['lngth'] =prods['lngth'] / 100
+    prods['wdth'] =prods['wdth'] / 100
+    prods['wb'] =prods['wb'] / 100
+    prods['mpg'] =prods['mpg'] / 10
     ###################################
     # build clustering ids
-    maindf['clustering_ids'] = [maindf['name'][i]+str(maindf['market_ids'][i]) for i,_ in maindf.iterrows() ]
-    for name in maindf['name'].unique():
-        chars = maindf[maindf['name'] == name ][['market_ids','car_ids','hp','lngth','wdth','wb']].to_numpy()
+    prods['clustering_ids'] = [prods['name'][i]+str(prods['market_ids'][i]) for i,_ in prods.iterrows() ]
+    for name in prods['name'].unique():
+        chars = prods[prods['name'] == name ][['market_ids','car_ids','hp','lngth','wdth','wb']].to_numpy()
         iref = 0
         for i in range(chars.shape[0]):
             if (2* np.abs( chars[i,2:] - chars[iref,2:]) /  (chars[i,2:]+chars[iref,2:]) ).max() >= 0.1:
                 iref = i
             else:
-                prev_model_cid = maindf[(maindf['car_ids'] == chars[iref,1]) ]['clustering_ids'].iloc[0]
-                maindf.loc[(maindf['car_ids'] == chars[i,1]), 'clustering_ids']= prev_model_cid
+                prev_model_cid = prods[(prods['car_ids'] == chars[iref,1]) ]['clustering_ids'].iloc[0]
+                prods.loc[(prods['car_ids'] == chars[i,1]), 'clustering_ids']= prev_model_cid
 
     if pyblp_compatibility:
         # sometimes there are multiple products with the same name, same year; it is not clear how BLP treat that but the following 
@@ -222,37 +224,59 @@ def load_blp_data(pyblp_compatibility=True):
             4247: 'DGCOLT87', 4316: 'PTGRAN86',4485: 'SA900089', 5517: 'MB560S90', 5563: 'SA900090', 5590: 'PS911C90'}
 
         for i in cids_to_change.keys():
-            maindf.loc[(maindf['car_ids'] == i), 'clustering_ids']= cids_to_change[i]
+            prods.loc[(prods['car_ids'] == i), 'clustering_ids']= cids_to_change[i]
     #
-    maindf['market_ids'] = 1900+maindf['market_ids']
-    maindf['region']=[ 'US' if (maindf['dom'][i]==1) else (  'EU'  if (maindf['eu'][i]==1) else 'JP') for i,_ in maindf.iterrows()]
-    #maindf['verdum']= 1 - maindf['dom'] - maindf['eu'] - pd.Series(np.where(maindf['firm_ids'] == 21 , 1, 0)) - maindf['dfi'] + maindf['ci']
-    maindf['hpwt'] = maindf['hp'] / maindf['wght']
-    maindf['space']= maindf['lngth'] * maindf['wdth']
-    maindf['trend'] = maindf['market_ids'] - maindf['market_ids'][0]
+    prods['market_ids'] = 1900+prods['market_ids']
+    prods['region']=[ 'US' if (prods['dom'][i]==1) else (  'EU'  if (prods['eu'][i]==1) else 'JP') for i,_ in prods.iterrows()]
+    #prods['verdum']= 1 - prods['dom'] - prods['eu'] - pd.Series(np.where(prods['firm_ids'] == 21 , 1, 0)) - prods['dfi'] + prods['ci']
+    prods['hpwt'] = prods['hp'] / prods['wght']
+    prods['space']= prods['lngth'] * prods['wdth']
+    prods['trend'] = prods['market_ids'] - prods['market_ids'][0]
     #
-    theseries= [None]+[maindf[name] for name in ['hpwt', 'air', 'mpd']]
-    maindf[['demand_instruments'+str(k) for k in range(8)] ] = create_blp_instruments(maindf,theseries)
-    theseries = [None, np.log(maindf['hpwt']), maindf['air'], np.log(maindf['mpg']),np.log(maindf['space']) ]
-    maindf[['supply_instruments'+str(k) for k in range(10)] ] = create_blp_instruments(maindf,theseries)
-    theseries= [maindf['trend']]
-    maindf[['supply_instruments'+str(k) for k in [10,11] ] ] = create_blp_instruments(maindf,theseries)
-    maindf['supply_instruments11'] = maindf['mpd']
+    theseries= [None]+[prods[name] for name in ['hpwt', 'air', 'mpd']]
+    prods[['demand_instruments'+str(k) for k in range(8)] ] = create_blp_instruments(prods,theseries)
+    theseries = [None, np.log(prods['hpwt']), prods['air'], np.log(prods['mpg']),np.log(prods['space']) ]
+    prods[['supply_instruments'+str(k) for k in range(10)] ] = create_blp_instruments(prods,theseries)
+    theseries= [prods['trend']]
+    prods[['supply_instruments'+str(k) for k in [10,11] ] ] = create_blp_instruments(prods,theseries)
+    prods['supply_instruments11'] = prods['mpd']
 
+    # now, prepare agent data
+    mean_incomes_t = otherdf3['meanly'].to_numpy()
+    sd_incomes = 1.72
+    T,I = len(mean_incomes_t), len(unobs)
+    O_t,O_i = np.zeros(T),np.zeros(I)
+    income_random_i = unobs['income'].to_numpy()
+    income_ti = np.exp( mean_incomes_t[:,None]+ sd_incomes * income_random_i[None,:] ).flatten()
+    year_ti = (np.arange(1971,1991)[:,None]+O_i[None,:]).flatten()
+    weights_ti = (O_t[:,None] + unobs['weight'].to_numpy()[None,:]/200).flatten()
+    nodes_ti_k = (O_t[:,None,None] + unobs[ ['const','hpwt','air','mpd','space']].to_numpy()[None,:,:]).reshape((T*I,-1))
+    agent_data=pd.DataFrame()
+    agent_data[ ['market_ids','weights']+ ['nodes' +str(i) for i in [0,1,2,3,4] ] + ['income'] ] = np.block([[year_ti[:,None],weights_ti[:,None],nodes_ti_k,income_ti[:,None] ]])
+
+    # check consistency with pyblp
     if pyblp_compatibility:
-        import pyblp, warnings
+        import pyblp
+        # check if product data coincide
         product_data = pd.read_csv(pyblp.data.BLP_PRODUCTS_LOCATION)
         list_problems = []
         for thecol in product_data.columns:
-            if pd.to_numeric(maindf[thecol], errors='coerce').notna().all():
-                same = ( (np.abs(product_data[thecol]-maindf[thecol])  ) <= 1e-5 * np.abs(product_data[thecol]+maindf[thecol]) ) .all()  
+            if pd.to_numeric(prods[thecol], errors='coerce').notna().all():
+                same = ( (np.abs(product_data[thecol]-prods[thecol])  ) <= 1e-5 * np.abs(product_data[thecol]+prods[thecol]) ) .all()  
             else:
-                same = (product_data[thecol]== maindf[thecol]).all()
+                same = (product_data[thecol]== prods[thecol]).all()
             if not same:
                 list_problems.append(thecol)
-            #print(thecol+': '+( 'ok' if same else '*** pb ***' ) )
         if list_problems:
-            print("Discrepancy with pyblp for the following variables: "+', '.join(list_problems))
+            print("Discrepancy in product data with pyblp for the following variables: "+', '.join(list_problems))
         else:
-            print("All variables are consistent with pyblp.")
-    return maindf
+            print("Product data matches pyblp.")
+        
+        # now check if agent data coincide
+        agent_data_pyblp = pd.read_csv(pyblp.data.BLP_AGENTS_LOCATION)
+        if (agent_data - agent_data_pyblp).to_numpy().max()>1e-10:
+            print('*** Problem ***. Agent data does not match pyblp.')
+        else:
+            print('Agent data matches pyblp.')
+
+    return prods,agent_data
