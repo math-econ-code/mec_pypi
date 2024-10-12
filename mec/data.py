@@ -253,6 +253,7 @@ def load_blp_data(pyblp_compatibility=True):
     nodes_ti_k = (O_t[:,None,None] + unobs[ ['const','hpwt','air','mpd','space']].to_numpy()[None,:,:]).reshape((T*I,-1))
     agent_data=pd.DataFrame()
     agent_data[ ['market_ids','weights']+ ['nodes' +str(i) for i in [0,1,2,3,4] ] + ['income'] ] = np.block([[year_ti[:,None],weights_ti[:,None],nodes_ti_k,income_ti[:,None] ]])
+    agent_data['market_ids']=agent_data['market_ids'].astype(int) 
 
     # check consistency with pyblp
     if pyblp_compatibility:
