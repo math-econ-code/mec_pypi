@@ -159,7 +159,7 @@ def load_blp_data(pyblp_compatibility=True):
                            header=None).head(20)
     erates = pd.read_csv( thepath + 'lagged_erate.asc', sep='\s+', names=['yenlag','dmlag'] ,header=None)
 
-    unobs = pd.read_csv(the_path+'../gentzkow-shapiro/unobs_pub.csv').dropna(axis=1, how='all')
+    unobs = pd.read_csv(thepath+'../gentzkow-shapiro/unobs_pub.csv').dropna(axis=1, how='all')
     
     # define a function to load instruments
     def create_blp_instruments(df, theseries):
