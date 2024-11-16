@@ -24,7 +24,7 @@ def iv_gmm(Y_i,X_i_k,Z_i_l, efficient=False, centering = True):
     return beta_k,objval
 
 
-def partGstar(theLambda_k_k,epsilon_t_i_k, xi_k_y,maxit = 100000, reltol=1E-8):
+def partGstar(pi_t_y,theLambda_k_k,epsilon_t_i_k, xi_k_y,maxit = 100000, reltol=1E-8):
     (K ,Y ) = xi_k_y.shape
     (T,I,_) = epsilon_t_i_k.shape
     n_t_i = np.ones((T,1)) @ np.ones((1,I)) / I
