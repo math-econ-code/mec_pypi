@@ -27,6 +27,7 @@ def iv_gmm(Y_i,X_i_k,Z_i_l, efficient=False, centering = True):
 def partGstar(theLambda_k_k,epsilon_t_i_k, xi_k_y,maxit = 100000, reltol=1E-8):
     (K ,Y ) = xi_k_y.shape
     (T,I,_) = epsilon_t_i_k.shape
+    n_t_i = np.ones((T,1)) @ np.ones((1,I)) / I
     varepsilon_t_i_y = (epsilon_t_i_k.reshape((-1,K)) @ theLambda_k_k @ xi_k_y).reshape((T,I,Y))
     U_t_y = np.zeros((T,Y))
     for i in range(maxit): # ipfp
