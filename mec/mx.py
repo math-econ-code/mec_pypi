@@ -48,6 +48,6 @@ def partGstar(pi_t_y,theLambda_k_k,epsilon_t_i_k, xi_k_y,maxit = 100000, reltol=
     Deltapi = sp.diags(pi_t_i_y.flatten())
     proj = sp.kron(sp.eye(T),sp.kron( sp.eye(I), sp.diags([1],shape=(Y+1,Y)).toarray()) )
     A = (Sigma @ Deltapi @ Sigma.T).tocsc()
-    B = (Sigma @ Deltapi @ proj @ sp.kron( epsilon_ti_k , xi_k_y.T )).tocsc()
+    B = (Sigma @ Deltapi @ proj @ sp.kron( epsilon_t_i_k.reshape((-1,K)) , xi_k_y.T )).tocsc()
     dUdLambda_t_y_k_k = - sp.linalg.spsolve(A,B).toarray().reshape((T,I+Y,K,K))[:,-Y:,:,:]
     return(U_t_y, dUdLambda_t_y_k_k)
