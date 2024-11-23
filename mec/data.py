@@ -3,6 +3,7 @@ import pkg_resources
 import pandas as pd
 import tabulate as tb
 
+
 def load_stigler_data(nbi = 9, nbj = 77, verbose=False):
 
     thepath = pkg_resources.resource_filename('mec', 'datasets/stigler-diet/StiglerData1939.txt')
@@ -106,8 +107,6 @@ def load_Rust_data():
     return np.vstack([getcleandata(name,nrow) for (name, nrow) in [ ('g870',36),('rt50',60),('t8h203',81),('a530875',128) ]])
 
 
-import numpy as np, pandas as pd
-
 
 def load_blp_data(pyblp_compatibility=True):
     """
@@ -118,6 +117,7 @@ def load_blp_data(pyblp_compatibility=True):
     """
 
     thepath = pkg_resources.resource_filename('mec', 'datasets/demand_blp/blp_1999/')
+    from mec.mx import create_blp_instruments
 
     column_names = [
         'name',       # name: Model name
