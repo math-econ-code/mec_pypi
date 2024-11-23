@@ -24,6 +24,25 @@ def iv_gmm(Y_i,X_i_k,Z_i_l, efficient=False, centering = True):
     return beta_k,objval
 
 
+def create_blp_instruments(X, mkts_firms_prods,include_ones = False):
+    if include_ones:
+        X = np.block([[np.ones((X.shape[0],1)), X ]] )
+    df = pd.DataFrame()
+    names = [str(i) for i in range(X.shape[1])]
+    df[ names ]=X
+    df[['mkt','firm','prod']] = mkts_firms_prods
+    thelist1, thelist2 = [], []
+    for _, theserie in df[ names ].items():
+        thelist1.append ([theserie[(df['mkt']==df['mkt'][i]) & 
+                                (df['firm']==df['firm'][i]) & 
+                                (df['prod']!=df['prod'][i])  ].sum() for i,_ in df.iterrows() ])
+
+        thelist2.append([theserie[(df['mkt']==df['mkt'][i]) & 
+                                (df['firm']!=df['firm'][i]) ].sum() for i,_ in df.iterrows() ])
+
+    return np.array(thelist1+thelist2).T
+
+
 def pi_inv(pi_t_y,theLambda_k_k,epsilon_t_i_k, xi_k_y,maxit = 100000, reltol=1E-8, require_grad =False):
     (K ,Y ) = xi_k_y.shape
     (T,I,_) = epsilon_t_i_k.shape
