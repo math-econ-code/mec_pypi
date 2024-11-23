@@ -1,7 +1,6 @@
 # Econometrics library
 
-import numpy as np
-import scipy.sparse as sp
+import numpy as np, scipy.sparse as sp, pandas as pd
 
 
 def iv_gmm(Y_i,X_i_k,Z_i_l, efficient=False, centering = True):
