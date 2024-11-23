@@ -281,3 +281,24 @@ def load_blp_data(pyblp_compatibility=True):
             print('Agent data matches pyblp.')
 
     return prods,agent_data
+
+
+def create_blp_instruments(X, product_markets, product_firms, product_id):
+    df = pd.DataFrame()
+    namesX = ['X'+str(i) for i in range(X.shape[1])]
+    df[namesX]=X
+    df['market_ids'] = product_markets
+    df['firm_ids'] = product_firms
+    df['car_ids'] = product_id
+    theseries = [df[name] for name in namesX]
+    thelist=[]
+    for theserie in theseries:
+        thelist.append ([theserie[(df['market_ids']==df['market_ids'][i]) & 
+                                (df['firm_ids']==df['firm_ids'][i])     & 
+                                (df['car_ids']!=df['car_ids'][i])        ].sum() for i,_ in df.iterrows() ])
+
+    for theserie in theseries:
+        thelist.append([theserie[(df['market_ids']==df['market_ids'][i]) & 
+                                (df['firm_ids']!=df['firm_ids'][i])      ].sum() for i,_ in df.iterrows() ])
+    
+    return np.array(thelist).T
