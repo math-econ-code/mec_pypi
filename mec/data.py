@@ -108,6 +108,26 @@ def load_Rust_data():
 
 import numpy as np, pandas as pd
 
+
+def create_blp_instruments(X, mkts_firms_prods,include_ones = False):
+    if include_ones:
+        X = np.block([[np.ones((X.shape[0],1)), X ]] )
+    df = pd.DataFrame()
+    names = [str(i) for i in range(X.shape[1])]
+    df[ names ]=X
+    df[['mkt','firm','prod']] = mkts_firms_prods
+    thelist1, thelist2 = [], []
+    for _, theserie in df[ names ].items():
+        thelist1.append ([theserie[(df['mkt']==df['mkt'][i]) & 
+                                (df['firm']==df['firm'][i]) & 
+                                (df['prod']!=df['prod'][i])  ].sum() for i,_ in df.iterrows() ])
+
+        thelist2.append([theserie[(df['mkt']==df['mkt'][i]) & 
+                                (df['firm']!=df['firm'][i]) ].sum() for i,_ in df.iterrows() ])
+
+    return np.array(thelist1+thelist2).T
+
+
 def load_blp_data(pyblp_compatibility=True):
     """
     Returns the data used by Berry, Levinsohn and Pakes (2005)
@@ -161,20 +181,6 @@ def load_blp_data(pyblp_compatibility=True):
 
     unobs = pd.read_csv(thepath+'../gentzkow-shapiro/unobs_pub.csv').dropna(axis=1, how='all')
     
-    # define a function to load instruments
-    def create_blp_instruments(df, theseries):
-        theseries = [pd.Series(len(df)*[1]) if s is None else s for s in theseries]
-        thelist= []
-        for theserie in theseries:
-            thelist.append ([theserie[(df['market_ids']==df['market_ids'][i]) & 
-                                    (df['firm_ids']==df['firm_ids'][i])     & 
-                                    (df['car_ids']!=df['car_ids'][i])        ].sum() for i,_ in df.iterrows() ])
-
-        for theserie in theseries:
-            thelist.append([theserie[(df['market_ids']==df['market_ids'][i]) & 
-                                    (df['firm_ids']!=df['firm_ids'][i])      ].sum() for i,_ in df.iterrows() ])
-        
-        return np.array(thelist).T
     
     # convert 1990 displacement from liters to cubic inches
     prods.loc[prods['market_ids'] == 90, 'disp'] = prods.loc[prods['market_ids'] == 90, 'disp'] * 61.02
@@ -233,14 +239,14 @@ def load_blp_data(pyblp_compatibility=True):
     prods['space']= prods['lngth'] * prods['wdth']
     prods['trend'] = prods['market_ids'] - prods['market_ids'][0]
     #
-    theseries= [None]+[prods[name] for name in ['hpwt', 'air', 'mpd']]
-    prods[['demand_instruments'+str(k) for k in range(8)] ] = create_blp_instruments(prods,theseries)
-    theseries = [None, np.log(prods['hpwt']), prods['air'], np.log(prods['mpg']),np.log(prods['space']) ]
-    prods[['supply_instruments'+str(k) for k in range(10)] ] = create_blp_instruments(prods,theseries)
-    theseries= [prods['trend']]
-    prods[['supply_instruments'+str(k) for k in [10,11] ] ] = create_blp_instruments(prods,theseries)
+    mkts_firms_prods = prods[['market_ids', 'firm_ids', 'car_ids']].to_numpy()
+    instr_vals = prods[['hpwt', 'air', 'mpd']].to_numpy()
+    prods[['demand_instruments'+str(k) for k in range(8)] ] = create_blp_instruments(instr_vals,mkts_firms_prods,include_ones=1)
+    instr_vals =pd.DataFrame([np.log(prods['hpwt']), prods['air'], np.log(prods['mpg']),np.log(prods['space']) ]).T.to_numpy()
+    prods[['supply_instruments'+str(k) for k in range(10)] ] = create_blp_instruments(instr_vals,mkts_firms_prods,include_ones=True)
+    instr_vals = prods['trend'].to_numpy().reshape((-1,1))
+    prods[['supply_instruments'+str(k) for k in [10,11] ] ] = create_blp_instruments(instr_vals,mkts_firms_prods,include_ones=0)
     prods['supply_instruments11'] = prods['mpd']
-
     # now, prepare agent data
     mean_incomes_t = otherdf3['meanly'].to_numpy()
     sd_incomes = 1.72
@@ -281,24 +287,3 @@ def load_blp_data(pyblp_compatibility=True):
             print('Agent data matches pyblp.')
 
     return prods,agent_data
-
-
-def create_blp_instruments(X, product_markets, product_firms, product_id):
-    df = pd.DataFrame()
-    namesX = ['X'+str(i) for i in range(X.shape[1])]
-    df[namesX]=X
-    df['market_ids'] = product_markets
-    df['firm_ids'] = product_firms
-    df['car_ids'] = product_id
-    theseries = [df[name] for name in namesX]
-    thelist=[]
-    for theserie in theseries:
-        thelist.append ([theserie[(df['market_ids']==df['market_ids'][i]) & 
-                                (df['firm_ids']==df['firm_ids'][i])     & 
-                                (df['car_ids']!=df['car_ids'][i])        ].sum() for i,_ in df.iterrows() ])
-
-    for theserie in theseries:
-        thelist.append([theserie[(df['market_ids']==df['market_ids'][i]) & 
-                                (df['firm_ids']!=df['firm_ids'][i])      ].sum() for i,_ in df.iterrows() ])
-    
-    return np.array(thelist).T
