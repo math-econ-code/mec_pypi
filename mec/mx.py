@@ -42,11 +42,11 @@ def create_blp_instruments(X, mkts_firms_prods,include_ones = False):
     return np.array(thelist1+thelist2).T
 
 
-def pi_inv(pi_t_y,theLambda_k_k,epsilon_t_i_k, xi_k_y,maxit = 100000, reltol=1E-8, require_grad =False):
-    (K ,Y ) = xi_k_y.shape
-    (T,I,_) = epsilon_t_i_k.shape
+def pi_inv(pi_t_y,theLambda_k_l,epsilon_t_i_k, xi_l_y,maxit = 100000, reltol=1E-8, require_grad =False):
+    (L ,Y ) = xi_l_y.shape
+    (T,I,K) = epsilon_t_i_k.shape
     n_t_i = np.ones((T,1)) @ np.ones((1,I)) / I
-    varepsilon_t_i_y = (epsilon_t_i_k.reshape((-1,K)) @ theLambda_k_k @ xi_k_y).reshape((T,I,Y))
+    varepsilon_t_i_y = (epsilon_t_i_k.reshape((-1,K)) @ theLambda_k_l @ xi_l_y).reshape((T,I,Y))
     U_t_y = np.zeros((T,Y))
     for i in range(maxit): # ipfp
         max_t_i = np.maximum((U_t_y[:,None,:] + varepsilon_t_i_y).max(axis = 2),0)
