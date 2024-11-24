@@ -67,8 +67,8 @@ def pi_inv(pi_t_y,theLambda_k_l,epsilon_t_i_k, xi_l_y,maxit = 100000, reltol=1E-
         Deltapi = sp.diags(pi_t_i_y.flatten())
         proj = sp.kron(sp.eye(T),sp.kron( sp.eye(I), sp.diags([1],shape=(Y+1,Y)).toarray()) )
         A = (Sigma @ Deltapi @ Sigma.T).tocsc()
-        B = (Sigma @ Deltapi @ proj @ sp.kron( epsilon_t_i_k.reshape((-1,K)) , xi_k_y.T )).tocsc()
-        dUdLambda_t_y_k_k = - sp.linalg.spsolve(A,B).toarray().reshape((T,I+Y,K,K))[:,-Y:,:,:]
+        B = (Sigma @ Deltapi @ proj @ sp.kron( epsilon_t_i_k.reshape((-1,K)) , xi_l_y.T )).tocsc()
+        dUdLambda_t_y_k_l = - sp.linalg.spsolve(A,B).toarray().reshape((T,I+Y,K,L))[:,-Y:,:,:]
     else:
-        dUdLambda_t_y_k_k = None
-    return(U_t_y, dUdLambda_t_y_k_k)
+        dUdLambda_t_y_k_l = None
+    return(U_t_y, dUdLambda_t_y_k_l)
