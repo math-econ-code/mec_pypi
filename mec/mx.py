@@ -42,7 +42,7 @@ def create_blp_instruments(X, mkts_firms_prods,include_ones = False):
     return np.array(thelist1+thelist2).T
 
 
-def pi_inv(pi_t_y,theLambda_k_l,epsilon_t_i_k, xi_l_y,maxit = 100000, reltol=1E-8, require_grad =False):
+def pi_invs(pi_t_y,theLambda_k_l,epsilon_t_i_k, xi_l_y,maxit = 100000, reltol=1E-8, require_grad =False):
     (L ,Y ) = xi_l_y.shape
     (T,I,K) = epsilon_t_i_k.shape
     n_t_i = np.ones((T,1)) @ np.ones((1,I)) / I
@@ -72,3 +72,13 @@ def pi_inv(pi_t_y,theLambda_k_l,epsilon_t_i_k, xi_l_y,maxit = 100000, reltol=1E-
     else:
         dUdLambda_t_y_k_l = None
     return(U_t_y, dUdLambda_t_y_k_l)
+
+
+
+def pi_inv(pi_y,theLambda_k_l,epsilon_i_k, xi_l_y,maxit = 100000, reltol=1E-8, require_grad =False):
+    U_t_y, dUdLambda_t_y_k_l = pi_invs(pi_y[None,:],theLambda_k_l,epsilon_i_k[None,:,:], xi_l_y,maxit , reltol, require_grad )
+    if require_grad:
+        return U_t_y.squeeze(axis=0), dUdLambda_t_y_k_l.squeeze(axis=0)
+    else:
+        return U_t_y.squeeze(axis=0), None
+    
