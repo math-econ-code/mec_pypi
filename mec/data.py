@@ -222,11 +222,11 @@ def load_blp_data(pyblp_compatibility=True):
     #
     mkts_firms_prods = prods[['market_ids', 'firm_ids', 'car_ids']].to_numpy()
     instr_vals = prods[['hpwt', 'air', 'mpd']].to_numpy()
-    prods[['demand_instruments'+str(k) for k in range(8)] ] = create_blp_instruments(instr_vals,mkts_firms_prods,include_ones=1)
+    prods[['demand_instruments'+str(k) for k in range(8)] ] = create_blp_instruments(instr_vals,mkts_firms_prods,include_ones=1, include_arguments=False)
     instr_vals =pd.DataFrame([np.log(prods['hpwt']), prods['air'], np.log(prods['mpg']),np.log(prods['space']) ]).T.to_numpy()
-    prods[['supply_instruments'+str(k) for k in range(10)] ] = create_blp_instruments(instr_vals,mkts_firms_prods,include_ones=True)
+    prods[['supply_instruments'+str(k) for k in range(10)] ] = create_blp_instruments(instr_vals,mkts_firms_prods,include_ones=True , include_arguments=False)
     instr_vals = prods['trend'].to_numpy().reshape((-1,1))
-    prods[['supply_instruments'+str(k) for k in [10,11] ] ] = create_blp_instruments(instr_vals,mkts_firms_prods,include_ones=0)
+    prods[['supply_instruments'+str(k) for k in [10,11] ] ] = create_blp_instruments(instr_vals,mkts_firms_prods,include_ones=0, include_arguments = False)
     prods['supply_instruments11'] = prods['mpd']
     # now, prepare agent data
     mean_incomes_t = otherdf3['meanly'].to_numpy()
