@@ -12,7 +12,7 @@ def organize_markets(markets_o, vec_o):
             vs_y.append(vec_o[observations,:])
     return vs_y
 
-def flatten_markets(markets_o,vs_y):
+def collapse_markets(markets_o,vs_y):
     O = len(markets_o)
     if (len(vs_y[0].shape)==1):
         dimv = 1
