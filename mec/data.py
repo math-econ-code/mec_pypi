@@ -108,7 +108,7 @@ def load_Rust_data():
 
 
 
-def load_blp_data(pyblp_compatibility=True):
+def load_blp_data(check_pyblp_compatibility=False):
     """
     Returns the data used by Berry, Levinsohn and Pakes (2005)
     
@@ -202,7 +202,7 @@ def load_blp_data(pyblp_compatibility=True):
                 prev_model_cid = prods[(prods['car_ids'] == chars[iref,1]) ]['clustering_ids'].iloc[0]
                 prods.loc[(prods['car_ids'] == chars[i,1]), 'clustering_ids']= prev_model_cid
 
-    if pyblp_compatibility:
+    if check_pyblp_compatibility:
         # sometimes there are multiple products with the same name, same year; it is not clear how BLP treat that but the following 
         # ensures compatibility with pyblp by adjusting them manually
         cids_to_change = {1540: 'TYCORO71', 1542: 'TYCORO71', 1582: 'TYCORO71', 560: 'MCMONT73', 1084: 'OD9878', 1230: 'OD9878', 
@@ -243,7 +243,7 @@ def load_blp_data(pyblp_compatibility=True):
     agent_data['market_ids']=agent_data['market_ids'].astype(int) 
 
     # check consistency with pyblp
-    if pyblp_compatibility:
+    if check_pyblp_compatibility:
         import pyblp
         # check if product data coincide
         product_data = pd.read_csv(pyblp.data.BLP_PRODUCTS_LOCATION)

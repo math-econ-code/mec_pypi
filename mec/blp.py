@@ -1,6 +1,29 @@
 import numpy as np, scipy.sparse as sp
 
 
+
+def create_blp_instruments(X, mkts_firms_prods,include_ones = False, include_arguments = True ):
+    if include_ones:
+        X = np.block([[np.ones((X.shape[0],1)), X ]] )
+    df = pd.DataFrame()
+    names = [str(i) for i in range(X.shape[1])]
+    df[ names ]=X
+    df[['mkt','firm','prod']] = mkts_firms_prods
+    thelist1, thelist2 = [], []
+    for _, theserie in df[ names ].items():
+        thelist1.append ([theserie[(df['mkt']==df['mkt'][i]) & 
+                                (df['firm']==df['firm'][i]) & 
+                                (df['prod']!=df['prod'][i])  ].sum() for i,_ in df.iterrows() ])
+
+        thelist2.append([theserie[(df['mkt']==df['mkt'][i]) & 
+                                (df['firm']!=df['firm'][i]) ].sum() for i,_ in df.iterrows() ])
+    if include_arguments:
+        return np.block([[X,np.array(thelist1+thelist2).T]])
+    else:
+        return np.array(thelist1+thelist2).T
+ 
+
+
 def organize_markets(markets_o, vec_o):
     flatten =  (len(vec_o.shape)==1) or (vec_o.shape[1] ==1)
     vs_y =[]
