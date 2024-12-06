@@ -117,7 +117,7 @@ def load_blp_data(check_pyblp_compatibility=False):
     """
 
     thepath = pkg_resources.resource_filename('mec', 'datasets/demand_blp/blp_1999/')
-    from mec.mx import create_blp_instruments
+    from mec.blp import create_blp_instruments
 
     column_names = [
         'name',       # name: Model name

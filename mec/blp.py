@@ -23,6 +23,48 @@ def create_blp_instruments(X, mkts_firms_prods,include_ones = False, include_arg
         return np.array(thelist1+thelist2).T
  
 
+ 
+def pi_invs(pi_t_y,theLambda_k_l,epsilon_t_i_k, xi_l_y,maxit = 100000, reltol=1E-8, require_grad =False):
+    (L ,Y ) = xi_l_y.shape
+    (T,I,K) = epsilon_t_i_k.shape
+    n_t_i = np.ones((T,1)) @ np.ones((1,I)) / I
+    varepsilon_t_i_y = (epsilon_t_i_k.reshape((-1,K)) @ theLambda_k_l @ xi_l_y).reshape((T,I,Y))
+    U_t_y = np.zeros((T,Y))
+    for i in range(maxit): # ipfp
+        max_t_i = np.maximum((U_t_y[:,None,:] + varepsilon_t_i_y).max(axis = 2),0)
+        u_t_i = max_t_i + np.log ( np.exp(- max_t_i ) + np.exp(U_t_y[:,None,:] + varepsilon_t_i_y - max_t_i[:,:,None]).sum(axis = 2) ) - np.log(n_t_i)
+        max_t_y = (varepsilon_t_i_y - u_t_i[:,:,None]).max(axis=1)
+        Up_t_y = - max_t_y -np.log( np.exp(varepsilon_t_i_y - u_t_i[:,:,None] - max_t_y[:,None,:] ).sum(axis=1)  / pi_t_y)
+        if (np.abs(Up_t_y-U_t_y) < reltol * (np.abs(Up_t_y)+np.abs(U_t_y))/2).all():
+            break
+        else:
+            U_t_y = Up_t_y
+
+    if require_grad:
+        pi_t_i_y = np.concatenate( [ np.exp(U_t_y[:,None,:]+ varepsilon_t_i_y - u_t_i[:,:,None] ), 
+                                    np.exp( - u_t_i)[:,:,None]],axis=2)
+        
+        Sigma = sp.kron(sp.eye(T),sp.bmat([[sp.kron( sp.eye(I),      np.ones((1,Y+1)))            ],
+                                    [sp.kron(np.ones((1,I)),  sp.diags([1],shape=(Y,Y+1)))]]) )
+        Deltapi = sp.diags(pi_t_i_y.flatten())
+        proj = sp.kron(sp.eye(T),sp.kron( sp.eye(I), sp.diags([1],shape=(Y+1,Y)).toarray()) )
+        A = (Sigma @ Deltapi @ Sigma.T).tocsc()
+        B = (Sigma @ Deltapi @ proj @ sp.kron( epsilon_t_i_k.reshape((-1,K)) , xi_l_y.T )).tocsc()
+        dUdLambda_t_y_k_l = - sp.linalg.spsolve(A,B).toarray().reshape((T,I+Y,K,L))[:,-Y:,:,:]
+    else:
+        dUdLambda_t_y_k_l = None
+    return(U_t_y, dUdLambda_t_y_k_l)
+
+
+
+def pi_inv(pi_y,theLambda_k_l,epsilon_i_k, xi_l_y,maxit = 100000, reltol=1E-8, require_grad =False):
+    U_t_y, dUdLambda_t_y_k_l = pi_invs(pi_y[None,:],theLambda_k_l,epsilon_i_k[None,:,:], xi_l_y,maxit , reltol, require_grad )
+    if require_grad:
+        return U_t_y.squeeze(axis=0), dUdLambda_t_y_k_l.squeeze(axis=0)
+    else:
+        return U_t_y.squeeze(axis=0), None
+    
+
 
 def organize_markets(markets_o, vec_o):
     flatten =  (len(vec_o.shape)==1) or (vec_o.shape[1] ==1)
