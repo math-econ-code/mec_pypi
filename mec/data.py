@@ -118,8 +118,8 @@ def load_blp_car_data(fast = True, check_pyblp_compatibility=False):
 
     if fast:
         thepath = pkg_resources.resource_filename('mec', 'datasets/demand_blp/preloaded/')
-        prods = pd.read_csv("prod.csv", index_col=0)
-        agent_data = pd.read_csv("agents.csv", index_col=0)
+        prods = pd.read_csv(thepath+"prod.csv", index_col=0)
+        agent_data = pd.read_csv(thepath+"agents.csv", index_col=0)
         return prods,agent_data
 
     thepath = pkg_resources.resource_filename('mec', 'datasets/demand_blp/blp_1999/')
