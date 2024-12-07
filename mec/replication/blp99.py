@@ -29,5 +29,5 @@ def construct_car_variables_from_blp():
     theZS[:,-1] = prod['mpd'].to_numpy()
     theZS[:,5] += 71.
     ZSs_y_ind = mec.blp.organize_markets(mkt_o,theZS)
-    xis_y_l = [ np.concatenate([p_y.reshape((-1,1)),X_y_ind],axis=1) for (p_y,X_y_ind) in zip(ps_y,Xs_y_ind) ]
-    return mkt_o,Xs_y_ind,firms_y,ps_y,pis_y,Zs_y_ind,ZSs_y_ind ,xis_y_l
+    xis_y_ind = [ np.concatenate([p_y.reshape((-1,1)),X_y_ind],axis=1) for (p_y,X_y_ind) in zip(ps_y,Xs_y_ind) ]
+    return mkt_o,Xs_y_ind,firms_y,ps_y,pis_y,Zs_y_ind,ZSs_y_ind ,xis_y_ind

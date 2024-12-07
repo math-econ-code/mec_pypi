@@ -24,7 +24,7 @@ def create_blp_instruments(X, mkts_firms_prods,include_ones = False, include_arg
  
 
  
-def pi_invs(pi_t_y,theLambda_k_l,epsilon_t_i_k, xi_l_y,maxit = 100000, reltol=1E-8, require_grad =False):
+def pi_invs(pi_t_y,theLambda_k_l,epsilon_t_i_k, xi_l_y,maxit = 100000, reltol=1E-8, require_der = 0):
     (L ,Y ) = xi_l_y.shape
     (T,I,K) = epsilon_t_i_k.shape
     n_t_i = np.ones((T,1)) @ np.ones((1,I)) / I
@@ -40,7 +40,8 @@ def pi_invs(pi_t_y,theLambda_k_l,epsilon_t_i_k, xi_l_y,maxit = 100000, reltol=1E
         else:
             U_t_y = Up_t_y
 
-    if require_grad:
+    res = [U_t_y]
+    if require_der:
         pi_t_i_y = np.concatenate( [ np.exp(U_t_y[:,None,:]+ varepsilon_t_i_y - u_t_i[:,:,None] ), 
                                     np.exp( - u_t_i)[:,:,None]],axis=2)
         
@@ -51,15 +52,15 @@ def pi_invs(pi_t_y,theLambda_k_l,epsilon_t_i_k, xi_l_y,maxit = 100000, reltol=1E
         A = (Sigma @ Deltapi @ Sigma.T).tocsc()
         B = (Sigma @ Deltapi @ proj @ sp.kron( epsilon_t_i_k.reshape((-1,K)) , xi_l_y.T )).tocsc()
         dUdLambda_t_y_k_l = - sp.linalg.spsolve(A,B).toarray().reshape((T,I+Y,K,L))[:,-Y:,:,:]
-    else:
-        dUdLambda_t_y_k_l = None
-    return(U_t_y, dUdLambda_t_y_k_l)
+        res.append(dUdLambda_t_y_k_l)
+        
+    return res
 
 
 
-def pi_inv(pi_y,theLambda_k_l,epsilon_i_k, xi_l_y,maxit = 100000, reltol=1E-8, require_grad =False):
-    U_t_y, dUdLambda_t_y_k_l = pi_invs(pi_y[None,:],theLambda_k_l,epsilon_i_k[None,:,:], xi_l_y,maxit , reltol, require_grad )
-    if require_grad:
+def pi_inv(pi_y,theLambda_k_l,epsilon_i_k, xi_l_y,maxit = 100000, reltol=1E-8, require_der = 0 ):
+    U_t_y, dUdLambda_t_y_k_l = pi_invs(pi_y[None,:],theLambda_k_l,epsilon_i_k[None,:,:], xi_l_y,maxit , reltol, require_der )
+    if require_der>0:
         return U_t_y.squeeze(axis=0), dUdLambda_t_y_k_l.squeeze(axis=0)
     else:
         return U_t_y.squeeze(axis=0), None
