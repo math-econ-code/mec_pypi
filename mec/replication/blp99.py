@@ -12,8 +12,9 @@ from mec.blp import create_blp_instruments, pi_inv
 def construct_car_variables_from_blp():
     prod,agents = load_blp_car_data()
     mkt_o = prod['market_ids'].to_numpy()
+    O = len(mkt_o)
     #
-    Xs_y_ind = mec.blp.organize_markets(mkt_o, np.block([np.ones( (obs,1) ), prod[ ['hpwt','air','mpd','space' ]] ]))
+    Xs_y_ind = mec.blp.organize_markets(mkt_o, np.block([np.ones( (O,1) ), prod[ ['hpwt','air','mpd','space' ]] ]))
     #
     firms_y = mec.blp.organize_markets(mkt_o,prod['firm_ids'].to_numpy())
     ps_y = mec.blp.organize_markets(mkt_o,prod['prices'].to_numpy())
@@ -22,7 +23,7 @@ def construct_car_variables_from_blp():
     #
     Zs_y_ind = mec.blp.organize_markets(mkt_o, create_blp_instruments(mec.blp.collapse_markets(mkt_o,Xs_y_ind), prod[['market_ids','firm_ids','car_ids']] ))
     #
-    theW = np.block([np.ones( (obs,1) ), prod[ ['hpwt','air','mpg','space','trend' ]] ])
+    theW = np.block([np.ones( (O,1) ), prod[ ['hpwt','air','mpg','space','trend' ]] ])
     theW[:,[1,3,4] ]= np.log(theW[:,[1,3,4] ])
     theZS = create_blp_instruments(theW , prod[['market_ids','firm_ids','car_ids']] )
     theZS[:,-1] = prod['mpd'].to_numpy()
