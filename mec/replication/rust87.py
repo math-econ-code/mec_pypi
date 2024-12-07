@@ -6,7 +6,8 @@
 import numpy as np, pandas as pd, scipy.sparse as sp
 from mec.data import load_Rust_data
 
-def build_rust_model_primitives(thedata, X=90):
+def build_rust_model_primitives(X=90):
+    thedata = load_Rust_data()
     theta30 = (thedata[:,2]==0).mean()
     theta31 = (thedata[:,2]==1).mean()
     theta32 = 1-theta30 - theta31
