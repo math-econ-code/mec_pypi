@@ -59,11 +59,11 @@ def pi_invs(pi_t_y,theLambda_k_l,eta_t_i_k, xi_l_y,maxit = 100000, reltol=1E-8, 
 
 
 def pi_inv(pi_y,theLambda_k_l,eta_i_k, xi_l_y,maxit = 100000, reltol=1E-8, require_der = 0 ):
-    U_t_y, dUdLambda_t_y_k_l = pi_invs(pi_y[None,:],theLambda_k_l,eta_i_k[None,:,:], xi_l_y,maxit , reltol, require_der )
+    res = pi_invs(pi_y[None,:],theLambda_k_l,eta_i_k[None,:,:], xi_l_y,maxit , reltol, require_der )
     if require_der>0:
-        return U_t_y.squeeze(axis=0), dUdLambda_t_y_k_l.squeeze(axis=0)
+        return [res[0].squeeze(axis=0), res[1].squeeze(axis=0)]
     else:
-        return U_t_y.squeeze(axis=0), None
+        return [res[0].squeeze(axis=0) ]
     
 
 

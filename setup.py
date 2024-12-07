@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
 	name="mec",
-	version="0.184",
+	version="0.185",
 	authors=["Alfred Galichon"],
 	author_email="ag133@nyu.edu",
 	licence="",
