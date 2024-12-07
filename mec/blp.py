@@ -24,11 +24,11 @@ def create_blp_instruments(X, mkts_firms_prods,include_ones = False, include_arg
  
 
  
-def pi_invs(pi_t_y,theLambda_k_l,epsilon_t_i_k, xi_l_y,maxit = 100000, reltol=1E-8, require_der = 0):
+def pi_invs(pi_t_y,theLambda_k_l,eta_t_i_k, xi_l_y,maxit = 100000, reltol=1E-8, require_der = 0):
     (L ,Y ) = xi_l_y.shape
-    (T,I,K) = epsilon_t_i_k.shape
+    (T,I,K) = eta_t_i_k.shape
     n_t_i = np.ones((T,1)) @ np.ones((1,I)) / I
-    varepsilon_t_i_y = (epsilon_t_i_k.reshape((-1,K)) @ theLambda_k_l @ xi_l_y).reshape((T,I,Y))
+    varepsilon_t_i_y = (eta_t_i_k.reshape((-1,K)) @ theLambda_k_l @ xi_l_y).reshape((T,I,Y))
     U_t_y = np.zeros((T,Y))
     for i in range(maxit): # ipfp
         max_t_i = np.maximum((U_t_y[:,None,:] + varepsilon_t_i_y).max(axis = 2),0)
@@ -50,16 +50,16 @@ def pi_invs(pi_t_y,theLambda_k_l,epsilon_t_i_k, xi_l_y,maxit = 100000, reltol=1E
         Deltapi = sp.diags(pi_t_i_y.flatten())
         proj = sp.kron(sp.eye(T),sp.kron( sp.eye(I), sp.diags([1],shape=(Y+1,Y)).toarray()) )
         A = (Sigma @ Deltapi @ Sigma.T).tocsc()
-        B = (Sigma @ Deltapi @ proj @ sp.kron( epsilon_t_i_k.reshape((-1,K)) , xi_l_y.T )).tocsc()
+        B = (Sigma @ Deltapi @ proj @ sp.kron( eta_t_i_k.reshape((-1,K)) , xi_l_y.T )).tocsc()
         dUdLambda_t_y_k_l = - sp.linalg.spsolve(A,B).toarray().reshape((T,I+Y,K,L))[:,-Y:,:,:]
         res.append(dUdLambda_t_y_k_l)
-        
+
     return res
 
 
 
-def pi_inv(pi_y,theLambda_k_l,epsilon_i_k, xi_l_y,maxit = 100000, reltol=1E-8, require_der = 0 ):
-    U_t_y, dUdLambda_t_y_k_l = pi_invs(pi_y[None,:],theLambda_k_l,epsilon_i_k[None,:,:], xi_l_y,maxit , reltol, require_der )
+def pi_inv(pi_y,theLambda_k_l,eta_i_k, xi_l_y,maxit = 100000, reltol=1E-8, require_der = 0 ):
+    U_t_y, dUdLambda_t_y_k_l = pi_invs(pi_y[None,:],theLambda_k_l,eta_i_k[None,:,:], xi_l_y,maxit , reltol, require_der )
     if require_der>0:
         return U_t_y.squeeze(axis=0), dUdLambda_t_y_k_l.squeeze(axis=0)
     else:
@@ -90,31 +90,31 @@ def collapse_markets(markets_o,vs_y):
         vec_o[observations,:] = v_y.reshape((-1,dimv))
     return vec_o.flatten() if (dimv == 1) else vec_o
 
-def compute_shares(Us_y,epsilon_t_i_k, xis_y_l,thelambda_k_l):
+def compute_shares(Us_y,eta_t_i_k, xis_y_l,thelambda_k_l):
     pis_y = []
     for (t,(U_y,xi_y_l)) in enumerate(zip(Us_y,xis_y_l)):
-        epsilon_i_k = epsilon_t_i_k[t,:,:]
-        varepsilon_i_y = epsilon_i_k @ thelambda_k_l @ xi_y_l.T
+        eta_i_k = eta_t_i_k[t,:,:]
+        varepsilon_i_y = eta_i_k @ thelambda_k_l @ xi_y_l.T
         pi_y = (np.exp(U_y[None,:] + varepsilon_i_y ) / (1+ np.exp( U_y[None,:] + varepsilon_i_y ).sum(axis= 1) )[:,None] ).mean(axis=0)
         pis_y.append(pi_y)
     return pis_y
 
-def compute_utilities(pis_y,epsilon_t_i_k, xis_y_l,thelambda_k_l):
+def compute_utilities(pis_y,eta_t_i_k, xis_y_l,thelambda_k_l):
     Us_y = []
     (K,L)=thelambda_k_l.shape
     for (t,(pi_y,xi_y_l)) in enumerate(zip(pis_y,xis_y_l)):
-        epsilon_i_k = epsilon_t_i_k[t,:,:]        
-        U_y = pi_inv(pi_y,thelambda_k_l,epsilon_i_k, xi_y_l.T)[0].flatten()
+        eta_i_k = eta_t_i_k[t,:,:]        
+        U_y = pi_inv(pi_y,thelambda_k_l,eta_i_k, xi_y_l.T)[0].flatten()
         Us_y.append(U_y)
     return Us_y
 
-def compute_omegas(Us_y,epsilon_t_i_k, xis_y_l,thelambda_k_l,firms_y ):
+def compute_omegas(Us_y,eta_t_i_k, xis_y_l,thelambda_k_l,firms_y ):
     omegas_y_y = []
     for (t,(U_y,xi_y_l,firm_y)) in enumerate(zip(Us_y,xis_y_l, firms_y)):
         Y = len(U_y)
-        epsilon_i_k = epsilon_t_i_k[t,:,:]
-        varepsilon_i_y = epsilon_i_k @ thelambda_k_l @ xi_y_l.T
-        epslambda0_i = epsilon_i_k @ thelambda_k_l[:,0]
+        eta_i_k = eta_t_i_k[t,:,:]
+        varepsilon_i_y = eta_i_k @ thelambda_k_l @ xi_y_l.T
+        epslambda0_i = eta_i_k @ thelambda_k_l[:,0]
         pi_i_y = (np.exp(U_y[None,:] + varepsilon_i_y ) / (1+ np.exp( U_y[None,:] + varepsilon_i_y ).sum(axis= 1) )[:,None] )
         jacobian_i_y_y =  - epslambda0_i[:,None,None] * (pi_i_y[:,:,None] * np.eye(Y)[None,:,:] - pi_i_y[:,:,None] * pi_i_y[:,None,:] )
         deriv_shares_y_y =jacobian_i_y_y.mean(axis= 0)
@@ -126,16 +126,16 @@ def compute_omegas(Us_y,epsilon_t_i_k, xis_y_l,thelambda_k_l,firms_y ):
         omegas_y_y.append(deriv_shares_y_y)
     return omegas_y_y
 
-def compute_omega(Us_y,epsilon_t_i_k, xis_y_l,thelambda_k_l,firms_y ):
-    return sp.block_diag(compute_omegas(Us_y,epsilon_t_i_k, xis_y_l,thelambda_k_l,firms_y ) )
+def compute_omega(Us_y,eta_t_i_k, xis_y_l,thelambda_k_l,firms_y ):
+    return sp.block_diag(compute_omegas(Us_y,eta_t_i_k, xis_y_l,thelambda_k_l,firms_y ) )
 
-def compute_inv_omega(markets_o, U_o,epsilon_t_i_k, xi_o_l,thelambda_k_l,firms_o):
-    deriv_shares = compute_omegas(Us_y,epsilon_t_i_k, xis_y_l,thelambda_k_l,firms_y )
+def compute_inv_omega(markets_o, U_o,eta_t_i_k, xi_o_l,thelambda_k_l,firms_o):
+    deriv_shares = compute_omegas(Us_y,eta_t_i_k, xis_y_l,thelambda_k_l,firms_y )
     return sp.block_diag( [np.linalg.inv(block) for block in deriv_shares] )
 
-def compute_marginal_costs( Us_y,ps_y,pis_y,epsilon_t_i_k, xis_y_l,thelambda_k_l,firms_y ):
+def compute_marginal_costs( Us_y,ps_y,pis_y,eta_t_i_k, xis_y_l,thelambda_k_l,firms_y ):
     mcs_y = []
-    omegas_y_y = compute_omegas(Us_y,epsilon_t_i_k, xis_y_l,thelambda_k_l,firms_y)
+    omegas_y_y = compute_omegas(Us_y,eta_t_i_k, xis_y_l,thelambda_k_l,firms_y)
     for (t,(U_y,p_y,pi_y,xi_y_l,firm_y,omega_y_y)) in enumerate(zip(Us_y,ps_y,pis_y,xis_y_l, firms_y,omegas_y_y)): 
         mc_y = p_y - np.linalg.solve(omega_y_y,pi_y) # first-order Bertrand equilibrium foc
         mc_y[mc_y < 0] = 0.001 # marginal costs must be nonnegative
