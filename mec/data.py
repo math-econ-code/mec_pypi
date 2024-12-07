@@ -110,7 +110,7 @@ def load_Rust_data():
 
 def load_blp_car_data(fast = True, check_pyblp_compatibility=False):
     """
-    Returns the data used by Berry, Levinsohn and Pakes (2005)
+    Returns the data used by Berry, Levinsohn and Pakes (1999)
     
     output:
         a pandas dataframe with product-level observations
