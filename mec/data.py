@@ -108,13 +108,19 @@ def load_Rust_data():
 
 
 
-def load_blp_data(check_pyblp_compatibility=False):
+def load_blp_car_data(fast = True, check_pyblp_compatibility=False):
     """
     Returns the data used by Berry, Levinsohn and Pakes (2005)
     
     output:
         a pandas dataframe with product-level observations
     """
+
+    if fast:
+        thepath = pkg_resources.resource_filename('mec', 'datasets/demand_blp/preloaded/')
+        prods = pd.read_csv("prod.csv", index_col=0)
+        agent_data = pd.read_csv("agents.csv", index_col=0)
+        return prods,agent_data
 
     thepath = pkg_resources.resource_filename('mec', 'datasets/demand_blp/blp_1999/')
     from mec.blp import create_blp_instruments
