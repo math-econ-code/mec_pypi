@@ -58,7 +58,7 @@ def pi_invs(pi_t_y,epsilon_t_i_y_m, tau_m, maxit = 100000, reltol=1E-8, require_
             U_t_y = Up_t_y
 
     res = [U_t_y]
-    if require_der:
+    if require_der>0:
         pi_t_i_y = np.concatenate( [ np.exp(U_t_y[:,None,:]+ varepsilon_t_i_y - u_t_i[:,:,None] ), 
                                     np.exp( - u_t_i)[:,:,None]],axis=2)
         
@@ -71,16 +71,15 @@ def pi_invs(pi_t_y,epsilon_t_i_y_m, tau_m, maxit = 100000, reltol=1E-8, require_
         dUdtau_t_y_m = - sp.linalg.spsolve(A,B).toarray().reshape((T,I+Y,M))[:,-Y:,:]
         res.append(dUdtau_t_y_m)
 
+    
+
     return res
 
 
 
 def pi_inv(pi_y,epsilon_i_y_m, tau_m, maxit = 100000, reltol=1E-8, require_der = 0 ):
     res = pi_invs(pi_y[None,:],epsilon_i_y_m[None,:,:,:] ,tau_m,  maxit , reltol, require_der )
-    if require_der>0:
-        return [res[0].squeeze(axis=0), res[1].squeeze(axis=0)]
-    else:
-        return [res[0].squeeze(axis=0) ]
+    return [res[i].squeeze(axis=0) for i in range(require_der+1)]
     
 
 
@@ -126,21 +125,36 @@ def compute_utilities(pis_y,epsilons_i_y_m, tau_m):
     return Us_y
 
 
-def compute_omegas(Us_y,epsilons_i_y_m,depsilonsdp_i_y_m, tau_m,firms_y ):
+def compute_omegas(Us_y,epsilons_i_y_m,depsilonsdp_i_y_m, tau_m,firms_y, require_der = 0):
     omegas_y_y = []
     for (U_y,epsilon_i_y_m,depsilondp_i_y_m,firm_y) in zip(Us_y,epsilons_i_y_m, depsilonsdp_i_y_m, firms_y):
         Y = len(U_y)
         varepsilon_i_y = epsilon_i_y_m @ tau_m
         dvarepsilondp_i_y = depsilondp_i_y_m @ tau_m
         pi_i_y = (np.exp(U_y[None,:] + varepsilon_i_y ) / (1+ np.exp( U_y[None,:] + varepsilon_i_y ).sum(axis= 1) )[:,None] )
-        jacobian_i_y_y = -  dvarepsilondp_i_y[:,:,None] * (pi_i_y[:,:,None] * np.eye(Y)[None,:,:] - pi_i_y[:,:,None] * pi_i_y[:,None,:] )
-        deriv_shares_y_y =jacobian_i_y_y.mean(axis= 0)
+        I_y_y = np.eye(Y) 
+        dpidu_i_y_y =   pi_i_y[:,:,None] *( I_y_y[None,:,:] - pi_i_y[:,None,:] )
+        dpidp_y_y = ( dvarepsilondp_i_y[:,None,:] * dpidu_i_y_y ).mean(axis= 0)
+        # if require_der>0:
+        #     term0 = I_y_y[None,:,:,None] * I_y_y[None,:,None,:]
+        #     term1 = - I_y_y[None,:,:,None] * pi_i_y[:,None,None,:] 
+        #     term2 = - I_y_y[None,:,None,:] * pi_i_y[:,None,:,None] 
+        #     term3 = - I_y_y[None,None,:,:] * pi_i_y[:,None,:,None]
+        #     term4 =  2 * pi_i_y[:,None,None,:]*  pi_i_y[:,None,:,None]
+        #     d2pidu_i_y_y_y =    pi_i_y[:,:,None,None] *(term0  + term1 + term2 + term3 + term4  )
+        #     d2pidp_y_y_y = ( dvarepsilondp_i_y[:,None,:,None] * dvarepsilondp_i_y[:,None,None,:] * d2pidu_i_y_y_y).mean(axis= 0)
+
         for y in range(Y):
             for yprime in range(y+1):
                 if (firm_y[y]!=firm_y[yprime]):
-                    deriv_shares_y_y[y,yprime] = 0
-                    deriv_shares_y_y[yprime,y] = 0
-        omegas_y_y.append(deriv_shares_y_y)
+                    dpidp_y_y[y,yprime] = 0
+                    dpidp_y_y[yprime,y] = 0
+                    # if require_der>0:
+                    #     d2pidp_y_y_y[y,yprime,:] = 0
+                    #     d2pidp_y_y_y[yprime,y,:] = 0
+        omegas_y_y.append(- dpidp_y_y)
+        # if require_der>0:
+        #     omegas_y_y.append(d
     return omegas_y_y
 
 def compute_omega(Us_y,epsilons_i_y_m,depsilonsdp_i_y_m, tau_m,firms_y ):
