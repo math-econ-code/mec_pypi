@@ -26,14 +26,13 @@ def eta_from_lin(T=20, K=5, nu_mean=0 , nu_var=1, D_mean = None, D_var=None, I=5
     eta_t_i_ind = np.concatenate([nu,-D],axis = 0).transpose((2,1,0)) 
     return eta_t_i_ind
 
-def lambda_from_lin(K=5,theta_2 = np.array([43.501, 3.612, 4.628, 1.818, 1.05, 2.056]) ):
+def tau_from_lin(K=5,theta_2 = np.array([43.501, 3.612, 4.628, 1.818, 1.05, 2.056]) ):
     # for consistency with rainie lin's code
     gamma = np.zeros((K + 1, 1))
     gamma[0] = theta_2[0]
     sigma = np.zeros((K + 1, K + 1))
     np.fill_diagonal(sigma, np.append([0], theta_2[1:(K + 1)]))
-    thelambda_ind_ind =  np.block([[sigma.T],[gamma.flatten()]])
-    return thelambda_ind_ind
+    return np.block([[sigma.T],[gamma.flatten()]]).flatten()
 
 
 def construct_car_blp_model():
@@ -46,22 +45,23 @@ def construct_car_blp_model():
     O = len(mkt_o) # number of observations
     # phis_y_k are the regression matrices for demand side (not interacting with individual characteristics)
     phis_y_k = organize_markets(mkt_o, prod[['ones', 'hpwt','air','mpd','space' ]].to_numpy() )
-    # xi are the regression matrices for the demand side (interacting with indivudual characteristics)
+    # xis_y_ind are the regression matrices for the demand side (interacting with indivudual characteristics)
     xis_y_ind = organize_markets(mkt_o, prod[['prices','ones', 'hpwt','air','mpd','space' ]].to_numpy() )
-    # Z are the instruments for demand side
-    Zs_y_ind = organize_markets(mkt_o, create_blp_instruments(collapse_markets(mkt_o,phis_y_k), prod[['market_ids','firm_ids','car_ids']] ))
-    # W are the regression matrices for supply side
+    # zetas_y_d are the instruments for demand side
+    zetas_y_d = organize_markets(mkt_o, create_blp_instruments(collapse_markets(mkt_o,phis_y_k), prod[['market_ids','firm_ids','car_ids']] ))
+    # gammas_y_l are the regression matrices for supply side
     thegamma =  prod[['ones','hpwt','air','mpg','space','trend' ]].to_numpy()
     thegamma[:,[1,3,4] ]= np.log(thegamma[:,[1,3,4] ])
     gammas_y_l = organize_markets(mkt_o,thegamma)
-    # Z are the instruments for supply side
-    theZS = create_blp_instruments(thegamma , prod[['market_ids','firm_ids','car_ids']] )
-    theZS[:,-1] = prod['mpd'].to_numpy()
-    theZS[:,5] += 71.
-    ZSs_y_ind = organize_markets(mkt_o,theZS)
+    # chis_y_s are the instruments for supply side
+    thechi = create_blp_instruments(thegamma , prod[['market_ids','firm_ids','car_ids']] )
+    thechi[:,-1] = prod['mpd'].to_numpy()
+    thechi[:,5] += 71.
+    chis_y_s = organize_markets(mkt_o,thechi)
     #
+    # eta is the vector of unobservable agents characteristics
     eta_t_i_ind = eta_from_lin( )
-
+    #
     epsilons_i_y_m = build_epsilons(eta_t_i_ind, xis_y_ind)
     depsilonsdp_i_y_m = build_depsilonsdp(eta_t_i_ind, xis_y_ind)
-    return mkt_o,phis_y_k,gammas_y_l, firms_y,ps_y,pis_y,Zs_y_ind,ZSs_y_ind ,epsilons_i_y_m,depsilonsdp_i_y_m
+    return mkt_o,phis_y_k,gammas_y_l, firms_y,ps_y,pis_y,zetas_y_d,chis_y_s ,epsilons_i_y_m,depsilonsdp_i_y_m

@@ -4,8 +4,8 @@ import numpy as np, scipy.sparse as sp, pandas as pd
 
 
 def iv_gmm(Y_i,X_i_k,Z_i_l, efficient=False, centering = True):
-    def beta_gmm(Y_i,X_i_k,Z_i_l,W_l_l ):
-        ZtildeT_k_i = X_i_k.T @ Z_i_l @ W_l_l @ Z_i_l.T
+    def beta_gmm(Y_i,X_i_k,Z_i_l,W_l_l=None ):
+        ZtildeT_k_i =  (X_i_k.T @ Z_i_l  @ Z_i_l.T) if W_l_l is None else (X_i_k.T @ Z_i_l @ W_l_l @ Z_i_l.T)
         return np.linalg.solve(ZtildeT_k_i @ X_i_k,ZtildeT_k_i @ Y_i)
     I=len(Y_i)
     W_l_l = np.linalg.inv( Z_i_l.T @ Z_i_l / I)
