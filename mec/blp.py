@@ -67,8 +67,8 @@ def pi_invs(pi_t_y,epsilon_t_i_y_m, tau_m, maxit = 100000, reltol=1E-8, require_
         Deltapi = sp.diags(pi_t_i_y.flatten())
         proj = sp.kron(sp.eye(T),sp.kron( sp.eye(I), sp.diags([1],shape=(Y+1,Y)).toarray()) )
         A = (Sigma @ Deltapi @ Sigma.T).tocsc()
-        B = (Sigma @ Deltapi @ proj @ epsilon_t_i_y_m.reshape((-1,M)) ) .tocsc()
-        dUdtau_t_y_m = - sp.linalg.spsolve(A,B).toarray().reshape((T,I+Y,M))[:,-Y:,:]
+        B = (Sigma @ Deltapi @ proj @ epsilon_t_i_y_m.reshape((-1,M)) ) 
+        dUdtau_t_y_m = - sp.linalg.spsolve(A,B).reshape((T,I+Y,M))[:,-Y:,:]
         res.append(dUdtau_t_y_m)
 
     
