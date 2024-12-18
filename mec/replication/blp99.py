@@ -2,7 +2,7 @@
 # * Berry Levinsohn Pakes (1999) "Voluntary Export Restraints on Automobiles: Evaluating a Strategic Trade Policy" (https://www.jstor.org/stable/2171802)
 # * Gentzkow and Shapiro (2015). "Code and data for the analysis of the Berry Levinsohn Pakes method of moments paper" (https://scholar.harvard.edu/files/shapiro/files/blp_replication.pdf)
 # * Conlon and Gortmaker (2020). Python code for BLP estimation (https://github.com/jeffgortmaker/pyblp)
-# * Rainie Lin, 2021. Python code for BLP estimation (https://github.com/ranielin/Berry-Levinsohn-and-Pakes-1995-Replication)
+# * Rainie Lin (2021). Python code for BLP estimation (https://github.com/ranielin/Berry-Levinsohn-and-Pakes-1995-Replication)
 
 import numpy as np, pandas as pd
 from mec.data import load_blp_car_data
@@ -56,7 +56,7 @@ def construct_car_blp_model():
     # chis_y_s are the instruments for supply side
     thechi = create_blp_instruments(thegamma , prod[['market_ids','firm_ids','car_ids']] )
     thechi[:,-1] = prod['mpd'].to_numpy()
-    thechi[:,5] += 71.
+    # thechi[:,5] += 71.
     chis_y_s = organize_markets(mkt_o,thechi)
     #
     # eta is the vector of unobservable agents characteristics
