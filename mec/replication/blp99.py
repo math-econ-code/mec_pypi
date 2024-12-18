@@ -35,7 +35,8 @@ def tau_from_lin(K=5,theta_2 = np.array([43.501, 3.612, 4.628, 1.818, 1.05, 2.05
     return np.block([[sigma.T],[gamma.flatten()]]).flatten()
 
 
-def construct_car_blp_model():
+
+def construct_car_blp_model(lin_compatible = False):
     prod,_ = load_blp_car_data()
     prod['ones'] = 1.
     mkt_o = prod['market_ids'].to_numpy()
@@ -49,14 +50,18 @@ def construct_car_blp_model():
     xis_y_ind = organize_markets(mkt_o, prod[['prices','ones', 'hpwt','air','mpd','space' ]].to_numpy() )
     # zetas_y_d are the instruments for demand side
     zetas_y_d = organize_markets(mkt_o, create_blp_instruments(collapse_markets(mkt_o,phis_y_k), prod[['market_ids','firm_ids','car_ids']] ))
-    # gammas_y_l are the regression matrices for supply side
+    # gammas_y_l are the regression matrices for supply side, and chis_y_s are the instruments for supply side
     thegamma =  prod[['ones','hpwt','air','mpg','space','trend' ]].to_numpy()
     thegamma[:,[1,3,4] ]= np.log(thegamma[:,[1,3,4] ])
+    if lin_compatible:
+        thechi = create_blp_instruments(thegamma , prod[['market_ids','firm_ids','car_ids']] )
+        thegamma[:,-1] += 71.
+    else:
+        thechi = create_blp_instruments(thegamma , prod[['market_ids','firm_ids','car_ids']] )
     gammas_y_l = organize_markets(mkt_o,thegamma)
-    # chis_y_s are the instruments for supply side
-    thechi = create_blp_instruments(thegamma , prod[['market_ids','firm_ids','car_ids']] )
     thechi[:,-1] = prod['mpd'].to_numpy()
-    # thechi[:,5] += 71.
+    if lin_compatible:
+         thechi[:,5] += 71.
     chis_y_s = organize_markets(mkt_o,thechi)
     #
     # eta is the vector of unobservable agents characteristics
