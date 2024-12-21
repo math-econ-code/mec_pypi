@@ -26,7 +26,7 @@ def eta_from_lin(T=20, K=5, nu_mean=0 , nu_var=1, D_mean = None, D_var=None, I=5
     eta_t_i_ind = np.concatenate([nu,-D],axis = 0).transpose((2,1,0)) 
     return eta_t_i_ind
 
-def tau_from_lin(K=5,theta_2 = np.array([43.501, 3.612, 4.628, 1.818, 1.05, 2.056]) ):
+def tau_from_lin(theta_2 = np.array([43.501, 3.612, 4.628, 1.818, 1.05, 2.056]),K=5 ):
     # for consistency with rainie lin's code
     gamma = np.zeros((K + 1, 1))
     gamma[0] = theta_2[0]
