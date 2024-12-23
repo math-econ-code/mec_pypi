@@ -71,8 +71,6 @@ def pi_invs(pi_t_y,epsilon_t_i_y_m, tau_m, maxit = 100000, reltol=1E-8, require_
         dUdtau_t_y_m = - sp.linalg.spsolve(A,B).reshape((T,I+Y,M))[:,-Y:,:]
         res.append(dUdtau_t_y_m)
 
-    
-
     return res
 
 
@@ -117,12 +115,19 @@ def compute_shares(Us_y,epsilons_i_y_m, tau_m):
     return pis_y
 
 
-def compute_utilities(pis_y,epsilons_i_y_m, tau_m):
+def compute_utilities(pis_y,epsilons_i_y_m, tau_m, require_der = 0 ):
     Us_y = []
-    for (pi_y,epsilon_i_y_m) in zip(pis_y,epsilons_i_y_m):     
-        U_y = pi_inv(pi_y,epsilon_i_y_m, tau_m )[0].flatten()
+    if require_der>0:
+        dUs_y_m = []
+    for (pi_y,epsilon_i_y_m) in zip(pis_y,epsilons_i_y_m):
+        res_inversion = pi_inv(pi_y,epsilon_i_y_m, tau_m, require_der = require_der )
+        U_y = res_inversion[0].flatten()
         Us_y.append(U_y)
-    return Us_y
+        if require_der>0:
+            dU_y_m = res_inversion[1]
+            dUs_y_m.append(dU_y_m)
+    
+    return [Us_y] if require_der == 0 else [Us_y,dUs_y_m]
 
 
 def compute_omegas(Us_y,epsilons_i_y_m,depsilonsdp_i_y_m, tau_m,firms_y, require_der = 0):
