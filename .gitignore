@@ -1,2 +1,7 @@
 # OS or Editor folders
 .DS_Store
+.idea/.name
+.idea/mec_pypi.iml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml

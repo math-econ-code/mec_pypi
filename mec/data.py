@@ -19,7 +19,7 @@ def load_stigler_data(nbi = 9, nbj = 77, verbose=False):
         print('\nDaily nutrient requirement:')
         print(allowance)
     return({'N_i_j':thedata.iloc[:nbj, 4:(4+nbi)].fillna(0).to_numpy().T,
-            'd_i':np.array(allowance)[0:nbi],
+            'b_i':np.array(allowance)[0:nbi],
             'c_j':np.ones(len(commodities))[0:nbj],
             'names_i': list(thedata.columns)[4:(4+nbi)],
             'names_j':commodities[0:nbj]}) 

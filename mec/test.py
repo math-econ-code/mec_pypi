@@ -4,14 +4,14 @@ import mec.data
 def test_mec_lp_LP():
     from mec.lp import LP   
     data = mec.data.load_stigler_data(verbose = True)
-    dietLP = LP(data['N_i_j'].T,data['c_j'],data['d_i'])
+    dietLP = LP(data['N_i_j'].T,data['c_j'],data['b_i'])
     dietLP.gurobi_solve(verbose=0)
     return
 
 def test_mec_lp_Dictionary():
     from mec.lp import Dictionary
     dictionary_example = Dictionary(A_i_j = np.array([[2, 1], [1, 2]]),
-                                d_i = np.array([2,2]),
+                                b_i = np.array([2,2]),
                                 c_j = np.array([1,1]),
                                 slack_var_names_i = ['s_1', 's_2'],
                                 decision_var_names_j = ['x_1', 'x_2']

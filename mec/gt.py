@@ -36,7 +36,7 @@ class Matrix_game:
         return {'p_i': p_i, 'q_j': q_j, 'val': V_2}
 
     def simplex_solve(self, verbose=0):
-        tableau = Tableau(A_i_j = self.A_i_j, d_i = np.ones(self.nbi), c_j = np.ones(self.nbj),
+        tableau = Tableau(A_i_j = self.A_i_j, b_i = np.ones(self.nbi), c_j = np.ones(self.nbj),
                           decision_var_names_j = ['y_'+str(j) for j in range(self.nbj)])
         ystar, xstar, ystar_sum = tableau.simplex_solve()
         p_i = xstar / ystar_sum
@@ -133,7 +133,7 @@ class LCP: # z >= 0, w = M z + q >= 0, z.w = 0
 
     def create_tableau(self, display=False):
         tab = Tableau(A_i_j = -np.block([self.M_i_j, np.ones((self.nbi,1))]),
-                      d_i = self.q_i, c_j = None,
+                      b_i = self.q_i, c_j = None,
                       decision_var_names_j=self.z_names_i+['z_0'], slack_var_names_i=self.w_names_i)
         self.tableau = tab
         if display: tab.display()

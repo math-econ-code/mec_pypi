@@ -101,7 +101,7 @@ class Network_problem:
         arcsNames = [str(x)+str(y) for (x,y) in self.arcsList]
 
         self.tableau = Tableau(A_i_j = np.asarray(np.linalg.solve(self.B(active_basis),self.N(active_basis))),
-                               d_i = self.q0_z,
+                               b_i = self.q0_z,
                                c_j = self.gain_a(active_basis)[self.nonbasis(active_basis)],
                                slack_var_names_i = [arcsNames[i] for i in active_basis],
                                decision_var_names_j = [arcsNames[i] for i in self.nonbasis(active_basis)])
