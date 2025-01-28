@@ -230,6 +230,33 @@ class Dictionary(LP):
             print('\nValue = '+str(example_dict2.base[Symbol('obj')].subs([ (variable,0) for variable in example_dict2.nonbasic])))
         return self.solution()
 
+    def make_complements(self, verbose=0):
+        if self.nbi != self.nbj:
+            from warnings import warn
+            warn('Number of decision and slack variables does not match.')
+        comp_vars = {Symbol(name): Symbol(self.decision_var_names_j[i])
+                     for (i,name) in enumerate(self.slack_var_names_i) }
+        comp_vars.update( {Symbol(name): Symbol(self.slack_var_names_i[j])
+                           for (j,name) in enumerate(self.decision_var_names_j) } )
+        self.complements = comp_vars
+        return
+
+    def is_basis_complementary(self, verbose=0):
+        if self.nbi != self.nbj:
+            from warnings import warn
+            warn('Number of decision and slack variables does not match.')
+        for var in self.base.keys():
+            comp_var = self.complements[var]
+
+            if comp_var in self.base.keys():
+                if verbose > 0:
+                    print("Basis contains " + str(var) + " and " + str(comp_var))
+                return False
+
+        print("Complementary basis found!")
+        print(self.base.keys())
+        return True
+
 
 class Tableau(LP):
     def __init__(self, A_i_j, b_i, c_j = None, slack_var_names_i = None, decision_var_names_j = None): # A_i_j @ x_j + s_i = b_i
@@ -250,7 +277,7 @@ class Tableau(LP):
 
     def display(self):
         tableau = []
-        if c_j is not None:
+        if self.c_j is not None:
             tableau.append( ['Obj'] + list(self.tableau[0,:]) )
         for b in range(self.nbi):
             tableau.append([self.names_all_variables[self.k_b[b]]]+list(self.tableau[self.i_b[b],:]) )
@@ -260,7 +287,7 @@ class Tableau(LP):
         for k in range(self.nbk):
             if self.tableau[0,k] > 0:
                 return k
-        return None # If no entering variable found, None returned
+        return None # if no entering variable found, None returned
 
     #def determine_departing(self, kent): # Alfred
     #    thedic = {self.k_b[b]: self.tableau[self.i_b[b],-1] / self.tableau[self.i_b[b],kent]
@@ -277,7 +304,7 @@ class Tableau(LP):
                     runmin, kdep = ratio, self.k_b[b]
         return kdep
 
-    def update(self, kent, kdep):
+    def pivot(self, kent, kdep):
         bdep = self.k_b.index(kdep)
         idep = self.i_b[bdep]
         self.tableau[idep,:] = self.tableau[idep,:] / self.tableau[idep,kent]
@@ -319,8 +346,8 @@ class Tableau(LP):
                 s_i[self.k_b[b]] = self.tableau[self.i_b[b],-1]
             else:
                 x_j[self.k_b[b]-self.nbi] = self.tableau[self.i_b[b],-1]
-        y_i = - self.tableau[0,:self.nbi]
-        return x_j, y_i, x_j@self.c_j
+        y_i = - self.tableau[0,:self.nbi] # the dual variables are minus the coefficients in the primal objective
+        return x_j, y_i, x_j @ self.c_j
 
 ##########################################
 ######### Interior Point Methods #########

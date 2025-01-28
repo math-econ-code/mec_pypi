@@ -275,6 +275,32 @@ class Bimatrix_game:
                 'val1': α + np.min(self.A_i_j) - 1,
                 'val2': β + np.min(self.B_i_j) - 1}
 
+    def lemke_howson_solve_dictionary(self, verbose = 0):
+        dictionary = Dictionary(slack_var_names_i = ['s_'+str(i) for i in range(1,self.nbi+1)]
+                                                    + ['t_'+str(j) for j in range(1,self.nbj+1)],
+                                decision_var_names_j= ['x_'+str(i) for i in range(1,self.nbi+1)]
+                                                      + ['y_'+str(j) for j in range(1,self.nbj+1)],
+                                A_i_j = np.block([[np.zeros((self.nbi, self.nbi)), self.A_i_j],
+                                                  [self.B_i_j.T, np.zeros((self.nbj, self.nbj))]]),
+                                b_i = np.ones(self.nbi+self.nbj))
+        dictionary.make_complements()
+        entering_var = dictionary.nonbasic[0]
+        departing_var = dictionary.determine_departing(entering_var)
+        dictionary.pivot(entering_var, departing_var)
+        entering_var = dictionary.complements[departing_var]
+
+        while not dictionary.is_basis_complementary(verbose):
+            departing_var = dictionary.determine_departing(entering_var)
+            dictionary.pivot(entering_var, departing_var, verbose = 2)
+            entering_var = dictionary.complements[departing_var]
+
+        z_sol, _ = dictionary.solution()
+        x_sol = z_sol[:self.nbi]
+        y_sol = z_sol[self.nbi:(self.nbi+self.nbj)]
+        p, q = x_sol/x_sol.sum(), y_sol/y_sol.sum()
+
+        return p, q
+
 
 class LTU_problem:
     def __init__(self, Φ_x_y, λ_x_y = None, n_x = None, m_y = None):
