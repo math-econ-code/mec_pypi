@@ -347,7 +347,10 @@ class Tableau(LP):
             else:
                 x_j[self.k_b[b]-self.nbi] = self.tableau[self.i_b[b],-1]
         y_i = - self.tableau[0,:self.nbi] # the dual variables are minus the coefficients in the primal objective
-        return x_j, y_i, x_j @ self.c_j
+        if self.c_j is not None:
+            return x_j, y_i, x_j @ self.c_j
+        else:
+            return x_j, y_i, None
 
 ##########################################
 ######### Interior Point Methods #########
