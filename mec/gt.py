@@ -144,7 +144,7 @@ class LCP: # z >= 0, w = M z + q >= 0, z.w = 0
         wis = self.tableau.slack_var_names_i
         kent = 2*self.nbi # z_0 enters
         kdep = np.argmin(self.q_i) # w_istar departs
-        self.tableau.update(kent, kdep)
+        self.tableau.pivot(kent, kdep)
         if verbose>0: print((wis+zis)[kent] + ' enters, ' + (wis+zis)[kdep] + ' departs')
         if display: self.tableau.display()
         return kdep
@@ -169,7 +169,7 @@ class LCP: # z >= 0, w = M z + q >= 0, z.w = 0
             if verbose > 1:
                 print('Basis: ', [(wis+zis)[i] for i in self.tableau.k_b])
                 print((wis+zis)[kent], 'enters,', (wis+zis)[kdep], 'departs')
-            self.tableau.update(kent, kdep)
+            self.tableau.pivot(kent, kdep)
             if kdep == 2*self.nbi:
                 break
         print('==========')
@@ -260,7 +260,7 @@ class Bimatrix_game:
             if verbose > 1:
                 print('Basis: ', [(wks+zks)[i] for i in tab.k_b])
                 print((wks+zks)[kent], 'enters,', (wks+zks)[kdep], 'departs')
-            tab.update(kent, kdep)
+            tab.pivot(kent, kdep)
             if (complements[kent] not in tab.k_b) and (complements[kdep] in tab.k_b):
                 break
             else:
@@ -453,7 +453,7 @@ class TwoBases:
 
     def step(self,a_entering ,verbose= 0):
         a_departing = self.tableau_M.determine_departing(a_entering)
-        self.tableau_M.update(a_entering,a_departing)
+        self.tableau_M.pivot(a_entering,a_departing)
         
         if self.get_basis_M() ==self.get_basis_Phi():
             if verbose>0:
