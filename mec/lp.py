@@ -121,7 +121,7 @@ class Dictionary(LP):
     def determine_entering(self):
         self.nonbasic.sort(key=str) # Bland's rule
         for entering_var in self.nonbasic:
-            if diff(self.base[Symbol('obj')],entering_var) > 0 :
+            if self.base[Symbol('obj')].coeff(entering_var) > 0:
                 return entering_var
         return None # If no entering variable found, None returned
 
