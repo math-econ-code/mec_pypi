@@ -541,7 +541,7 @@ class OrdinalBasis:
 
     def determine_departing(self, a_entering):
         a_departing = self.tableau_M.determine_departing(a_entering)
-        self.tableau_M.update(a_entering,a_departing)
+        self.tableau_M.pivot(a_entering,a_departing)
         self.basis_M.remove(a_departing)
         self.basis_M.append(a_entering)
         return a_departing
