@@ -504,7 +504,7 @@ class OrdinalBasis:
         #self.Φ_z_a.T[self.Φ_z_a.T==self.K] = self.K - np.arange(0, np.sum(self.Φ_z_a==self.K))
 
     def init_basis_M(self):
-        self.tableau_M = Tableau(A_i_j=self.M_z_a[:,self.nbz:self.nba], d_i=self.q_z)
+        self.tableau_M = Tableau(A_i_j=self.M_z_a[:,self.nbz:self.nba], b_i=self.q_z)
         self.basis_M = list(self.tableau_M.k_b)   # k_b are the indices of columns associated with basic variables
         return
 
