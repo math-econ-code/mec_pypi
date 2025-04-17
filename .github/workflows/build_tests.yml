@@ -17,6 +17,11 @@ jobs:
     - uses: actions/setup-python@v2
       with:
           python-version: ${{ matrix.python-version }}
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: dist-artifacts
+        path: ./dist/*.whl
     
     - name: Upgrade pip
       run: |
@@ -43,7 +48,3 @@ jobs:
         skip_existing: true
       run: python -m twine upload --skip-existing --verbose dist/*        
               
-    - uses: actions/upload-artifact@v3
-      with:
-        name: dist-artifacts
-        path: ./dist/*.whl
