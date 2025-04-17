@@ -369,115 +369,300 @@ class LTU_problem:
         return μsol, usol, vsol
 
 
+# old version of OrdinalBasis
+# class TwoBases:
+#     def __init__(self,Phi_z_a,M_z_a,q_z=None,remove_degeneracies=True,M=None,eps=1e-5):
+#         self.Phi_z_a,self.M_z_a = Phi_z_a,M_z_a
+#         if M is None:
+#             M = self.Phi_z_a.max()
+#         self.nbstep,self.M,self.eps = 1,M,eps
+#         self.nbz,self.nba = self.Phi_z_a.shape
+#         if q_z is  None:
+#             self.q_z = np.ones(self.nbz)
+#         else:
+#             self.q_z = q_z
+#
+#         # remove degeneracies:
+#         if remove_degeneracies:
+#             self.Phi_z_a += np.arange(self.nba,0,-1)[None,:]* (self.Phi_z_a == self.M)
+#             self.q_z = self.q_z + np.arange(1,self.nbz+1)*self.eps
+#         # create an M and a Phi basis
+#         self.tableau_M = Tableau( self.M_z_a[:,self.nbz:self.nba], d_i = self.q_z )
+#         self.basis_Phi = list(range(self.nbz))
+#         ###
+#
+#     def init_a_entering(self,a_removed):
+#         self.basis_Phi.remove(a_removed)
+#         a_entering = self.nbz+self.Phi_z_a[a_removed,self.nbz:].argmax()
+#         self.basis_Phi.append(a_entering)
+#         self.entvar = a_entering
+#         return a_entering
+#
+#     def get_basis_M(self):
+#         return set(self.tableau_M.k_b)
+#
+#     def get_basis_Phi(self):
+#         return set(self.basis_Phi)
+#
+#     def is_standard_form(self):
+#         cond_1 = (np.diag(self.Phi_z_a)  == self.Phi_z_a.min(axis = 1) ).all()
+#         cond_2 = ((self.Phi_z_a[:,:self.nbz] + np.diag([np.inf] * self.nbz)).min(axis=1) >= self.Phi_z_a[:,self.nbz:].max(axis=1)).all()
+#         return (cond_1 & cond_2)
+#
+#     def p_z(self,basis=None):
+#         if basis is None:
+#             basis = self.get_basis_Phi()
+#         return self.Phi_z_a[:,list(basis)].min(axis = 1)
+#
+#     def musol_a(self,basis=None):
+#         if basis is None:
+#             basis = self.get_basis_M()
+#         B = self.M_z_a[:,list(basis)]
+#         mu_a = np.zeros(self.nba)
+#         mu_a[list(basis)] = np.linalg.solve(B,self.q_z)
+#         return mu_a
+#
+#     def is_feasible_basis(self,basis):
+#         try:
+#             if self.musol_a(list(basis) ).min()>=0:
+#                 return True
+#         except np.linalg.LinAlgError:
+#             pass
+#         return False
+#
+#     def is_ordinal_basis(self,basis):
+#         res, which =False,None
+#         if len(set(basis))==self.nbz:
+#             blocking = (self.Phi_z_a[:,basis].min(axis = 1)[:,None] < self.Phi_z_a).all(axis = 0)
+#             if blocking.any():
+#                 which = np.where(blocking)
+#         return res, which
+#
+#     def determine_entering(self,a_departing):
+#         self.nbstep += 1
+#         pbefore_z = self.p_z(self.basis_Phi)
+#         self.basis_Phi.remove(a_departing)
+#         pafter_z = self.p_z(self.basis_Phi)
+#         i0 = np.where(pbefore_z < pafter_z)[0][0]
+#         c0 = min([(c,self.Phi_z_a[i0,c]) for c in self.basis_Phi  ],key = lambda x: x[1])[0]
+#         zstar = [z for z in range(self.nbz) if pafter_z[z] == self.Phi_z_a[z,c0] and z != i0][0]
+#         eligible_columns = [c for c in range(self.nba) if min( [self.Phi_z_a[z,c] - pafter_z[z] for z in range(self.nbz) if z != zstar]) >0 ]
+#         a_entering = max([(c,self.Phi_z_a[zstar,c]) for c in eligible_columns], key = lambda x: x[1])[0]
+#         self.basis_Phi.append(a_entering)
+#         return a_entering
+#
+#     def step(self,a_entering ,verbose= 0):
+#         a_departing = self.tableau_M.determine_departing(a_entering)
+#         self.tableau_M.pivot(a_entering,a_departing)
+#
+#         if self.get_basis_M() ==self.get_basis_Phi():
+#             if verbose>0:
+#                 print('Solution found in '+ str(self.nbstep)+' steps. Basis=',self.get_basis_Phi() )
+#             return False
+#
+#         new_entcol = self.determine_entering(a_departing)
+#
+#         if verbose>1:
+#             print('Step=', self.nbstep)
+#             print('M basis = ' ,self.get_basis_M() )
+#             print('Phi basis = ' ,self.get_basis_Phi() )
+#             print('p_z=',self.p_z(list(self.get_basis_Phi()) ))
+#             print('entering var (M)=',a_entering)
+#             print('departing var (M and Phi)=',a_departing)
+#             print('entering var (Phi)=',new_entcol)
+#
+#         return new_entcol
+#
+#
+#     def solve(self,a_departing = 0, verbose=0):
+#         a_entering = self.init_a_entering(a_departing)
+#         while a_entering:
+#             a_entering = self.step(a_entering,verbose)
+#         return({'basis': self.get_basis_Phi(),
+#                 'mu_a':self.musol_a(),
+#                 'p_z':self.p_z()})
 
-class TwoBases:
-    def __init__(self,Phi_z_a,M_z_a,q_z=None,remove_degeneracies=True,M=None,eps=1e-5):
-        self.Phi_z_a,self.M_z_a = Phi_z_a,M_z_a
-        if M is None:
-            M = self.Phi_z_a.max()
-        self.nbstep,self.M,self.eps = 1,M,eps
-        self.nbz,self.nba = self.Phi_z_a.shape
-        if q_z is  None:
-            self.q_z = np.ones(self.nbz)
-        else:
-            self.q_z = q_z
-        
-        # remove degeneracies:
-        if remove_degeneracies:
-            self.Phi_z_a += np.arange(self.nba,0,-1)[None,:]* (self.Phi_z_a == self.M)
-            self.q_z = self.q_z + np.arange(1,self.nbz+1)*self.eps
-        # create an M and a Phi basis
-        self.tableau_M = Tableau( self.M_z_a[:,self.nbz:self.nba], d_i = self.q_z )
-        self.basis_Phi = list(range(self.nbz))
-        ###
-        
-    def init_a_entering(self,a_removed):
-        self.basis_Phi.remove(a_removed)
-        a_entering = self.nbz+self.Phi_z_a[a_removed,self.nbz:].argmax()
-        self.basis_Phi.append(a_entering)
-        self.entvar = a_entering
-        return a_entering
-    
-    def get_basis_M(self):
-        return set(self.tableau_M.k_b)
-    
-    def get_basis_Phi(self):
-        return set(self.basis_Phi)
+class OrdinalBasis:
+    def __init__(self, Φ_z_a, M_z_a, q_z=None, K=None, eps=1e-5):
+        if not (Φ_z_a.shape == M_z_a.shape):
+            raise ValueError('Φ_z_a and M_z_a must have the same size.')
+        self.Φ_z_a, self.M_z_a = Φ_z_a, M_z_a
+        if K is None:
+            K = Φ_z_a.max()
+        self.nbstep, self.K, self.eps = 0, K, eps
+        self.nbz, self.nba = self.Φ_z_a.shape
+        if q_z is None:
+            q_z = np.ones(self.nbz)
+        self.q_z = q_z
 
-    def is_standard_form(self):
-        cond_1 = (np.diag(self.Phi_z_a)  == self.Phi_z_a.min(axis = 1) ).all() 
-        cond_2 = ((self.Phi_z_a[:,:self.nbz] + np.diag([np.inf] * self.nbz)).min(axis=1) >= self.Phi_z_a[:,self.nbz:].max(axis=1)).all()
-        return (cond_1 & cond_2)
-        
-    def p_z(self,basis=None):
+    def remove_degeneracies(self):
+        self.Φ_z_a += np.arange(self.nba,0,-1) * (self.Φ_z_a == self.K)
+        self.q_z = self.q_z + np.arange(1,self.nbz+1)*self.eps
+        # As in Nguyen & Vohra:
+        #self.q_z = self.q_z - np.linspace(1, 2, self.nbz)*self.eps
+        #np.fill_diagonal(self.Φ_z_a[:,:self.nbz], self.Φ_z_a[:,self.nbz:].min(axis=1) - .001)
+        #self.Φ_z_a.T[self.Φ_z_a.T==self.K] = self.K - np.arange(0, np.sum(self.Φ_z_a==self.K))
+
+    def init_basis_M(self):
+        self.tableau_M = Tableau(A_i_j=self.M_z_a[:,self.nbz:self.nba], d_i=self.q_z)
+        self.basis_M = list(self.tableau_M.k_b)   # k_b are the indices of columns associated with basic variables
+        return
+
+    def μsol_a(self, basis=None):
         if basis is None:
-            basis = self.get_basis_Phi()
-        return self.Phi_z_a[:,list(basis)].min(axis = 1)    
-    
-    def musol_a(self,basis=None):
-        if basis is None:
-            basis = self.get_basis_M()
+            basis = self.basis_M
         B = self.M_z_a[:,list(basis)]
-        mu_a = np.zeros(self.nba)
-        mu_a[list(basis)] = np.linalg.solve(B,self.q_z)
-        return mu_a
+        μ_a = np.zeros(self.nba)
+        μ_a[list(basis)] = np.linalg.solve(B,self.q_z)
+        return μ_a
 
-    def is_feasible_basis(self,basis):    
-        try:
-            if self.musol_a(list(basis) ).min()>=0:
-                return True
-        except np.linalg.LinAlgError:
-            pass
-        return False
-        
-    def is_ordinal_basis(self,basis):
-        res, which =False,None
-        if len(set(basis))==self.nbz:
-            blocking = (self.Phi_z_a[:,basis].min(axis = 1)[:,None] < self.Phi_z_a).all(axis = 0)
+    def p_z(self, basis=None):
+        if basis is None:
+            basis = self.basis_Φ
+        return self.Φ_z_a[:,list(basis)].min(axis=1)
+
+    def is_ordinal_basis(self, basis):
+        ans, which = False, None
+        if len(basis)==self.nbz:
+            blocking = (self.Φ_z_a[:,list(basis)].min(axis = 1)[:,None] < self.Φ_z_a).all(axis = 0)
             if blocking.any():
                 which = np.where(blocking)
-        return res, which
+            else:
+                ans = True
+        return ans, which
 
-    def determine_entering(self,a_departing):
-        self.nbstep += 1
-        pbefore_z = self.p_z(self.basis_Phi)
-        self.basis_Phi.remove(a_departing)
-        pafter_z = self.p_z(self.basis_Phi)
-        i0 = np.where(pbefore_z < pafter_z)[0][0]
-        c0 = min([(c,self.Phi_z_a[i0,c]) for c in self.basis_Phi  ],key = lambda x: x[1])[0]
-        zstar = [z for z in range(self.nbz) if pafter_z[z] == self.Phi_z_a[z,c0] and z != i0][0]
-        eligible_columns = [c for c in range(self.nba) if min( [self.Phi_z_a[z,c] - pafter_z[z] for z in range(self.nbz) if z != zstar]) >0 ]
-        a_entering = max([(c,self.Phi_z_a[zstar,c]) for c in eligible_columns], key = lambda x: x[1])[0]
-        self.basis_Phi.append(a_entering)
+    def init_basis_Φ(self, a_departing):
+        self.basis_Φ = list(range(self.nbz))
+        self.basis_Φ.remove(a_departing)
+        a_entering = self.nbz + self.Φ_z_a[a_departing,self.nbz:].argmax()
+        self.basis_Φ.append(a_entering)
+        self.entcol = a_entering
         return a_entering
 
-    def step(self,a_entering ,verbose= 0):
+    def determine_departing(self, a_entering):
         a_departing = self.tableau_M.determine_departing(a_entering)
-        self.tableau_M.pivot(a_entering,a_departing)
-        
-        if self.get_basis_M() ==self.get_basis_Phi():
+        self.tableau_M.update(a_entering,a_departing)
+        self.basis_M.remove(a_departing)
+        self.basis_M.append(a_entering)
+        return a_departing
+
+    def determine_entering(self, a_departing):
+        pbefore_z = self.p_z(self.basis_Φ)
+        self.basis_Φ.remove(a_departing)
+        pafter_z = self.p_z(self.basis_Φ)
+        z0 = np.where(pbefore_z < pafter_z)[0][0]
+        a0 = self.basis_Φ[np.argmin(self.Φ_z_a[z0,self.basis_Φ])]
+        zstar = np.where(pbefore_z == self.Φ_z_a[:,a0])[0][0]
+        eligible_columns = np.where(np.all(np.delete(self.Φ_z_a, zstar, axis=0) > np.delete(pafter_z, zstar)[:, None], axis=0))[0]
+        a_entering = eligible_columns[np.argmax(self.Φ_z_a[zstar,eligible_columns])]
+        self.basis_Φ.append(a_entering)
+        return a_entering
+
+    def step(self, a_entering, verbose=0):
+        self.nbstep += 1
+        a_departing = self.determine_departing(a_entering)
+
+        if self.basis_M == self.basis_Φ:
             if verbose>0:
-                print('Solution found in '+ str(self.nbstep)+' steps. Basis=',self.get_basis_Phi() )
-            return False
-            
-        new_entcol = self.determine_entering(a_departing)
+                print('Solution found in '+ str(self.nbstep) +' steps.\nBasis:', self.basis_Φ)
+                return False
+            else:
+                new_entcol = self.determine_entering(a_departing)
+                if verbose>1:
+                    print('-- Step ' + str(self.nbstep) + ' --')
+                    print('Column ' + str(a_entering) + ' enters the M basis.')
+                    print('Column ' + str(a_departing) + ' leaves the two bases.')
+                    print('Column ' + str(new_entcol) + ' enters the Φ basis.')
+                    print('M basis: ', self.basis_M)
+                    print('Φ basis: ', self.basis_Φ)
+                    print('p_z =', self.p_z(self.basis_Φ))
 
+            return new_entcol
+
+    def solve(self, a_departing=0, verbose=0):
+        Φ_z_a_store, q_z_store = self.Φ_z_a.copy(), self.q_z.copy()
+        self.remove_degeneracies()
+        self.init_basis_M()
+        a_entering = self.init_basis_Φ(a_departing)
         if verbose>1:
-            print('Step=', self.nbstep)
-            print('M basis = ' ,self.get_basis_M() )
-            print('Phi basis = ' ,self.get_basis_Phi() )
-            print('p_z=',self.p_z(list(self.get_basis_Phi()) ))
-            print('entering var (M)=',a_entering)
-            print('departing var (M and Phi)=',a_departing)
-            print('entering var (Phi)=',new_entcol)
-
-        return new_entcol
-
-
-    def solve(self,a_departing = 0, verbose=0):
-        a_entering = self.init_a_entering(a_departing)
+            print('M basis: ', self.basis_M)
+            print('Φ basis: ', self.basis_Φ)
         while a_entering:
-            a_entering = self.step(a_entering,verbose)
-        return({'basis': self.get_basis_Phi(),
-                'mu_a':self.musol_a(),
-                'p_z':self.p_z()})
+            a_entering = self.step(a_entering, verbose)
+        self.Φ_z_a, self.q_z = Φ_z_a_store, q_z_store
+        return {'basis': self.basis_Φ, 'μ_a': self.μsol_a(), 'p_z': self.p_z()}
+
+    # In the following, experimental functions with LCPs
+    def solve_lcp(self,verbose=0):
+        m = grb.Model()
+        if verbose==0:
+            m.Params.OutputFlag = 0
+        m.Params.NonConvex = 2
+        mu_a = m.addMVar(self.nba)
+        d_a = m.addMVar(self.nba)
+        p_z = m.addMVar(self.nbz, lb = -grb.GRB.INFINITY)
+        delta_z_a = m.addMVar((self.nbz,self.nba))
+        pi_z_a = m.addMVar((self.nbz,self.nba))
+        m.addConstr(self.M_z_a @ mu_a == self.q_z)
+        m.addConstr(d_a[None,:] - p_z[:,None] + self.Φ_z_a == delta_z_a)
+        m.addConstr(pi_z_a.sum(axis=0) == 1)
+        m.setObjective( (d_a * mu_a).sum() + (delta_z_a*pi_z_a).sum(), sense = grb.GRB.MINIMIZE)
+        m.optimize()
+        print('pi_z_a:'), print(pi_z_a.x)
+        print('d_a:'), print(d_a.x)
+        return {'μ_a': mu_a.x, 'p_z': p_z.x}
+
+    def solve_lcp_six(self,verbose=0):
+        m = grb.Model()
+        M_z_a = self.M_z_a.copy()
+        Φ_z_a = self.Φ_z_a.copy()
+        print('M_z_a:'), print(M_z_a)
+        print('Φ_z_a:'), print(Φ_z_a)
+        Φ_z_a += 1
+        if verbose==0:
+            m.Params.OutputFlag = 0
+        m.Params.NonConvex = 2
+        π_z_a = m.addMVar(self.nbz*self.nba)
+        p_z = m.addMVar(self.nbz)
+        d_a = m.addMVar(self.nba)
+        w_z_a = m.addMVar(self.nbz*self.nba)
+        w_z = m.addMVar(self.nbz)
+        w_a = m.addMVar(self.nba)
+        M_Z = np.kron(np.eye(self.nbz), np.ones((1,self.nba)))
+        M_A = np.kron(np.ones((1,self.nbz)), np.eye(self.nba))
+        kronprod = np.kron(np.ones((1,self.nbz)), M_z_a)
+        m.addConstr(w_z_a == Φ_z_a.flatten() - M_Z.T @ p_z + M_A.T @ d_a)
+        m.addConstr(w_z == self.q_z + M_z_a @ np.ones(self.nba) - kronprod @ π_z_a)
+        m.addConstr(w_a == M_A @ π_z_a - 1)
+        m.setObjective(π_z_a @ w_z_a + p_z @ w_z + d_a @ w_a, sense = grb.GRB.MINIMIZE)
+        m.optimize()
+        print('π_z_a:'), print(π_z_a.x.round(3).reshape(self.nbz, self.nba))
+        return {'π_z_a': π_z_a.x.round().reshape(self.nbz, self.nba), 'p_z': p_z.x-1, 'd_a': d_a.x,
+                'μ_a': M_A @ π_z_a.x - 1}
+
+    def lemke_solve(self,verbose=0):
+        from mec.gt import LCP
+        Φ_z_a = self.Φ_z_a.copy() + 1 # +1 to ensure p_z > 0
+        M_Z = np.kron(np.eye(self.nbz), np.ones((1,self.nba)))
+        M_A = np.kron(np.ones((1,self.nbz)), np.eye(self.nba))
+        kronprod = np.kron(np.ones((1,self.nbz)), self.M_z_a)
+        π_names_z_a = ['π_'+str(z+1)+'_'+str(a+1) for z in range(self.nbz) for a in range(self.nba)]
+        p_names_z = ['p_'+str(z+1) for z in range(self.nbz)]
+        d_names_a = ['d_'+str(a+1) for a in range(self.nba)]
+        z_names_i = π_names_z_a + p_names_z + d_names_a
+        w_names_i = ['comp_'+z_names_i[i] for i in range(self.nbz*self.nba+self.nbz+self.nba)]
+        lcp = LCP(M_i_j = np.block([[np.zeros((self.nbz*self.nba,self.nbz*self.nba)), -M_Z.T, M_A.T],
+                                    [-kronprod, np.zeros((self.nbz,self.nbz+self.nba))],
+                                    [M_A, np.zeros((self.nba,self.nbz+self.nba))]]),
+                  q_i = np.hstack([Φ_z_a.flatten(), self.q_z + self.M_z_a @ np.ones(self.nba), -np.ones(self.nba)]),
+                  z_names_i = z_names_i, w_names_i = w_names_i)
+        sol = lcp.lemke_solve(verbose)
+        if sol is not None:
+            zsol, _ = sol
+            π_z_a = zsol[:(self.nbz*self.nba)]
+            p_z = zsol[-(self.nbz+self.nba):(-self.nba)]
+            d_a = zsol[-self.nba:]
+            return {'π_z_a': π_z_a.reshape(self.nbz, self.nba), 'p_z': p_z-1, 'd_a': d_a,
+                    'μ_a': M_A @ π_z_a - 1}
+        else:
+            return None
