@@ -6,7 +6,7 @@
 
 import numpy as np, pandas as pd
 from mec.data import load_blp_car_data
-from mec.blp import create_blp_instruments, organize_markets, collapse_markets,build_epsilons,build_depsilonsdp
+from mec.blp import create_blp_instruments, organize_markets, collapse_markets,build_nus,build_dnudps
 
 
 def eta_from_lin(T=20, K=5, nu_mean=0 , nu_var=1, D_mean = None, D_var=None, I=500, seed=123 ): # I = number of simulations per market
@@ -23,8 +23,8 @@ def eta_from_lin(T=20, K=5, nu_mean=0 , nu_var=1, D_mean = None, D_var=None, I=5
     nu = np.concatenate((nu_alpha, nu_beta), axis = 0)
     log_y = np.transpose(np.random.normal(D_mean, pow(D_var, 0.5), (I, 1, T)), (1, 0, 2))
     D = 1/np.exp(log_y)
-    eta_t_i_ind = np.concatenate([nu,-D],axis = 0).transpose((2,1,0)) 
-    return eta_t_i_ind
+    eta_t_i_l = np.concatenate([nu,-D],axis = 0).transpose((2,1,0)) 
+    return eta_t_i_l
 
 def tau_from_lin(theta_2 = np.array([43.501, 3.612, 4.628, 1.818, 1.05, 2.056]),K=5 ):
     # for consistency with rainie lin's code
@@ -46,8 +46,8 @@ def construct_car_blp_model(lin_compatible = False):
     O = len(mkt_o) # number of observations
     # phis_y_k are the regression matrices for demand side (not interacting with individual characteristics)
     phis_y_k = organize_markets(mkt_o, prod[['ones', 'hpwt','air','mpd','space' ]].to_numpy() )
-    # xis_y_ind are the regression matrices for the demand side (interacting with indivudual characteristics)
-    xis_y_ind = organize_markets(mkt_o, prod[['prices','ones', 'hpwt','air','mpd','space' ]].to_numpy() )
+    # xis_y_k are the regression matrices for the demand side (interacting with indivudual characteristics)
+    xis_y_k = organize_markets(mkt_o, prod[['prices','ones', 'hpwt','air','mpd','space' ]].to_numpy() )
     # zetas_y_d are the instruments for demand side
     zetas_y_d = organize_markets(mkt_o, create_blp_instruments(collapse_markets(mkt_o,phis_y_k), prod[['market_ids','firm_ids','car_ids']] ))
     # gammas_y_l are the regression matrices for supply side, and chis_y_s are the instruments for supply side
@@ -65,8 +65,8 @@ def construct_car_blp_model(lin_compatible = False):
     chis_y_s = organize_markets(mkt_o,thechi)
     #
     # eta is the vector of unobservable agents characteristics
-    eta_t_i_ind = eta_from_lin( )
+    eta_t_i_l = eta_from_lin( )
     #
-    epsilons_i_y_m = build_epsilons(eta_t_i_ind, xis_y_ind)
-    depsilonsdp_i_y_m = build_depsilonsdp(eta_t_i_ind, xis_y_ind)
-    return mkt_o,phis_y_k,gammas_y_l, firms_y,ps_y,pis_y,zetas_y_d,chis_y_s ,epsilons_i_y_m,depsilonsdp_i_y_m
+    nus_i_y_m = build_nus(eta_t_i_l, xis_y_k)
+    dnusdp_i_y_m = build_dnudps(eta_t_i_l, xis_y_k)
+    return mkt_o,phis_y_k,gammas_y_l, firms_y,ps_y,pis_y,zetas_y_d,chis_y_s ,nus_i_y_m,dnusdp_i_y_m
