@@ -128,8 +128,8 @@ def compute_utilities(pis_y,nus_i_y_m, tau_m, require_der = 0 ):
     return [Us_y] if require_der == 0 else [Us_y,dUs_y_m]
 
 
-def compute_omegas(Us_y,nus_i_y_m,dnudp_i_y_m, tau_m,firms_y, require_der = 0):
-    omegas_y_y = []
+def compute_Hs(Us_y,nus_i_y_m,dnudp_i_y_m, tau_m,firms_y, require_der = 0):
+    Hs_y_y = []
     for (U_y,nu_i_y_m,dnudp_i_y_m,firm_y) in zip(Us_y,nus_i_y_m, dnudp_i_y_m, firms_y):
         Y = len(U_y)
         nutau_i_y = nu_i_y_m @ tau_m
@@ -155,20 +155,20 @@ def compute_omegas(Us_y,nus_i_y_m,dnudp_i_y_m, tau_m,firms_y, require_der = 0):
                     # if require_der>0:
                     #     d2pidp_y_y_y[y,yprime,:] = 0
                     #     d2pidp_y_y_y[yprime,y,:] = 0
-        omegas_y_y.append(- dpidp_y_y)
+        Hs_y_y.append(- dpidp_y_y)
         # if require_der>0:
-        #     omegas_y_y.append(d
-    return omegas_y_y
+        #     Hs_y_y.append(d
+    return Hs_y_y
 
-def compute_omega(Us_y,nus_i_y_m,dnudp_i_y_m, tau_m,firms_y ):
-    return sp.block_diag(compute_omegas(Us_y,nus_i_y_m, dnudp_i_y_m, tau_m,firms_y ) )
+def compute_H(Us_y,nus_i_y_m,dnudp_i_y_m, tau_m,firms_y ):
+    return sp.block_diag(compute_Hs(Us_y,nus_i_y_m, dnudp_i_y_m, tau_m,firms_y ) )
 
 
 def compute_marginal_costs( Us_y,ps_y,pis_y,nus_i_y_m, dnudp_i_y_m, tau_m,firms_y ):
     mcs_y = []
-    omegas_y_y = compute_omegas(Us_y,nus_i_y_m, dnudp_i_y_m, tau_m,firms_y)
-    for (p_y,pi_y,omega_y_y) in zip(ps_y,pis_y,omegas_y_y): 
-        mc_y = p_y - np.linalg.solve(omega_y_y,pi_y) # first-order Bertrand equilibrium foc
+    Hs_y_y = compute_Hs(Us_y,nus_i_y_m, dnudp_i_y_m, tau_m,firms_y)
+    for (p_y,pi_y,H_y_y) in zip(ps_y,pis_y,Hs_y_y): 
+        mc_y = p_y - np.linalg.solve(H_y_y,pi_y) # first-order Bertrand equilibrium foc
         mc_y[mc_y < 0] = 0.001 # marginal costs must be nonnegative
         mcs_y.append(mc_y)
     return mcs_y
