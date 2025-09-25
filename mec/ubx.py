@@ -1,8 +1,8 @@
 def create_gist(username, platform = 'colab', verbose = 0):
-   if platform == 'colab':
-      create_gist_colab(username,verbose=verbose)
+    if platform == 'colab':
+        create_gist_colab(username,verbose=verbose)
     else:
-      raise Exception("Platform "+platform+' is not supported.')
+        raise Exception("Platform "+platform+' is not supported.')
       
 
   
@@ -12,7 +12,7 @@ def create_gist_colab(username,verbose = 0, ENV_PATH=None):
    if ENV_PATH is None:
       ENV_PATH = "/content/drive/MyDrive/secrets/github.env"
     # Install deps
-    !pip -q install PyGithub python-dotenv
+    ! pip -q install PyGithub python-dotenv
 
     import os, requests
     from dotenv import load_dotenv
