@@ -11,9 +11,6 @@ def create_gist_colab(username,verbose = 0, ENV_PATH=None):
    filename = username + "-actions.txt"
    if ENV_PATH is None:
       ENV_PATH = "/content/drive/MyDrive/secrets/github.env"
-    # Install deps
-    ! pip -q install PyGithub python-dotenv
-
     import os, requests
     from dotenv import load_dotenv
     from github import Github, Auth, InputFileContent
