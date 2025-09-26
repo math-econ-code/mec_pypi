@@ -1,6 +1,6 @@
 def get_token(platform = 'colab',ENV_PATH=None):
     if platform == 'colab':
-        return get_token_colab(username,verbose=verbose)
+        return get_token_colab(ENV_PATH)
     else:
         raise Exception("Platform "+platform+' is not supported.')
 
