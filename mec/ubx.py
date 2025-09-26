@@ -8,6 +8,10 @@ def create_gist(username, platform = 'colab', verbose = 0):
   
 
 def create_gist_colab(username,verbose = 0, ENV_PATH=None):
+    from google.colab import drive
+    drive.mount('/content/drive')
+
+
     filename = username + "-actions.txt"
     if ENV_PATH is None:
         ENV_PATH = "/content/drive/MyDrive/secrets/github.env"
