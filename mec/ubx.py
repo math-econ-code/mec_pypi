@@ -8,9 +8,9 @@ def create_gist(username, platform = 'colab', verbose = 0):
   
 
 def create_gist_colab(username,verbose = 0, ENV_PATH=None):
-   filename = username + "-actions.txt"
-   if ENV_PATH is None:
-      ENV_PATH = "/content/drive/MyDrive/secrets/github.env"
+    filename = username + "-actions.txt"
+    if ENV_PATH is None:
+        ENV_PATH = "/content/drive/MyDrive/secrets/github.env"
     import os, requests
     from dotenv import load_dotenv
     from github import Github, Auth, InputFileContent
@@ -28,7 +28,7 @@ def create_gist_colab(username,verbose = 0, ENV_PATH=None):
         timeout=20,
     )
     resp.raise_for_status()
-   if verbose>0:
+    if verbose>0:
         print("Authenticated as:", resp.json().get("login"))
         print("Token scopes (X-OAuth-Scopes):", resp.headers.get("X-OAuth-Scopes"))
 
@@ -59,4 +59,4 @@ def create_gist_colab(username,verbose = 0, ENV_PATH=None):
     print("Gist created!")
     print("Web view:", gist.html_url)
     print("Raw file:", gist.files[filename].raw_url)
-   return()
+    return()
