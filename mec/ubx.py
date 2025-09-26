@@ -1,13 +1,12 @@
-def get_token(username, platform = 'colab', verbose = 0):
+def get_token(platform = 'colab',ENV_PATH=None):
     if platform == 'colab':
         return get_token_colab(username,verbose=verbose)
     else:
         raise Exception("Platform "+platform+' is not supported.')
 
-def get_token_colab(username,verbose = 0, ENV_PATH=None):
+def get_token_colab( ENV_PATH=None):
     from google.colab import drive
     drive.mount('/content/drive')
-    filename = username + "-actions.txt"
     if ENV_PATH is None:
         ENV_PATH = "/content/drive/MyDrive/secrets/github.env"
     import os, requests
