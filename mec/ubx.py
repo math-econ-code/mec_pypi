@@ -1,30 +1,29 @@
-def create_gist(username, platform = 'colab', verbose = 0):
+def get_token(username, platform = 'colab', verbose = 0):
     if platform == 'colab':
-        create_gist_colab(username,verbose=verbose)
+        return get_token_colab(username,verbose=verbose)
     else:
         raise Exception("Platform "+platform+' is not supported.')
-      
 
-  
-
-def create_gist_colab(username,verbose = 0, ENV_PATH=None):
+def get_token_colab(username,verbose = 0, ENV_PATH=None):
     from google.colab import drive
     drive.mount('/content/drive')
-
-
     filename = username + "-actions.txt"
     if ENV_PATH is None:
         ENV_PATH = "/content/drive/MyDrive/secrets/github.env"
     import os, requests
     from dotenv import load_dotenv
     from github import Github, Auth, InputFileContent
-
     # Load token from Drive .env
     loaded = load_dotenv(ENV_PATH, override=True)
     assert loaded, f"Could not load {ENV_PATH}"
     TOKEN = os.getenv("GITHUB_TOKEN")
     assert TOKEN, "Missing GITHUB_TOKEN in .env"
+    return TOKEN
 
+
+def create_gist(username,TOKEN,verbose = 0):
+    filename = username + "-actions.txt"
+    import requests
     # (Optional) sanity check: see scopes returned by API headers
     resp = requests.get(
         "https://api.github.com/user",
