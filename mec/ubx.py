@@ -9,7 +9,7 @@ def get_token_colab( ENV_PATH=None):
     drive.mount('/content/drive')
     if ENV_PATH is None:
         ENV_PATH = "/content/drive/MyDrive/secrets/github.env"
-    import os, requests
+    import os
     from dotenv import load_dotenv
     # Load token from Drive .env
     loaded = load_dotenv(ENV_PATH, override=True)
@@ -21,7 +21,7 @@ def get_token_colab( ENV_PATH=None):
 
 def create_gist(username,TOKEN,verbose = 0):
     from github import Github, Auth, InputFileContent
-    import requests
+    import os, requests
     filename = username + "-actions.txt"
     # (Optional) sanity check: see scopes returned by API headers
     resp = requests.get(
