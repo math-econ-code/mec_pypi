@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mec"
-version = "0.226"
+version = "0.227"
 description = "description of the package"
 readme = "README.md"
 requires-python = ">=3"

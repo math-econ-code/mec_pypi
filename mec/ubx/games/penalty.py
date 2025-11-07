@@ -10,11 +10,8 @@ def url_fetch(url,field):
     except Exception as e:
         return None
 
-
-ua = "https://raw.githubusercontent.com/alfredgalichon/game0-admin_output/main/action.json"
-history = url_fetch(ua,"history")
-
-hist = [(i,j) for (i,j,_) in history]
-nbObs = len(hist)
-np.set_printoptions(precision=2, suppress=True)
-np.array([[hist.count((i,j)) for j in range(3)] for i in range(3)])/nbObs
+def show_score(url):
+    history = url_fetch(url,"history")
+    hist = [(i,j) for (i,j,_) in history]
+    nbObs = len(hist)
+    return np.array([[hist.count((i,j)) for j in range(3)] for i in range(3)])/nbObs
