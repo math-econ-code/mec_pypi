@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mec"
+version = "0.224"
+description = "description of the package"
+readme = "README.md"
+requires-python = ">=3"
+license = { file = "LICENSE" }  # or: { text = "MIT" }
+authors = [{ name = "Alfred Galichon", email = "ag133@nyu.edu" }]
+dependencies = [
+  "gurobipy",
+  "PyGithub",
+  "python-dotenv",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mec*"]
+
+[tool.setuptools.package-data]
+mec = [
+  "datasets/**/*.txt",
+  "datasets/**/*.csv",
+  "datasets/**/*.asc",
+  "datasets/*/*/*.asc",
+  "datasets/*/*/*.txt",
+  "datasets/*/*/*.csv",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"
