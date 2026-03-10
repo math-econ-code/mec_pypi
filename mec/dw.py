@@ -3,6 +3,215 @@ import gurobipy as grb
 import time
 import scipy.sparse as sp
 
+
+class Dantzig_Wolfe_vector_approach():
+    
+    def __init__(self, Phi_x_y, eps_i_y, eta_x_j, eps_i_0, eta_0_j, delta_i_x, delta_j_y):
+        
+        self.I, self.Y = eps_i_y.shape
+        self.X, self.J = eta_x_j.shape
+        
+        self.Phi_x_y = Phi_x_y
+        self.eps_i_y, self.eps_i_0 = eps_i_y, eps_i_0
+        self.eta_x_j, self.eta_0_j = eta_x_j, eta_0_j
+        
+        self.x_i, self.y_j = delta_i_x.argmax(axis=1), delta_j_y.argmax(axis=1)
+        self.delta_i_x, self.delta_j_y = sp.csr_matrix(delta_i_x), sp.csr_matrix(delta_j_y)
+        
+        self.phi_i_y = Phi_x_y[self.x_i,:] / 2 + eps_i_y
+        self.psi_x_j = Phi_x_y[:,self.y_j] / 2 + eta_x_j
+    
+        
+        self.Y_i_y, self.X_j_x = np.zeros((self.I, self.Y)), np.zeros((self.J, self.X))
+        if self.I* self.J < 1e9:
+            self.Phi_i_j = delta_i_x @ Phi_x_y @ delta_j_y.T + eps_i_y @ delta_j_y.T + delta_i_x @ eta_x_j
+    
+    def naive_solve(self, verbose=0):
+        t_start = time.perf_counter()
+
+        m = grb.Model("NaiveLP")
+        if verbose==0: m.Params.OutputFlag = 0
+
+        pi_i_j = m.addMVar((I,J), lb=0.0)
+        pi_i_0 = m.addMVar(I, lb=0.0)
+        pi_0_j = m.addMVar(J, lb=0.0)
+
+        m.setObjective( (pi_i_j * Phi_i_j).sum() + (pi_i_0 * self.eps_i_0).sum() + (pi_0_j * self.eta_0_j).sum(), grb.GRB.MAXIMIZE)
+        m.addConstr( pi_i_0 + pi_i_j.sum(axis=1) == 1.0 )
+        m.addConstr( pi_0_j + pi_i_j.T.sum(axis=1) == 1.0 )
+
+        m.optimize()
+
+        pi_i_j = np.array(m.x[:I*J]).reshape((I,J))
+
+        t = time.perf_counter() - t_start
+        print("\nTotal time:", t)
+
+        return pi_i_j, t, m
+
+    def unrestricted_solve(self, verbose=0):
+        t_start = time.perf_counter()
+
+        m = grb.Model("UnrestrictedMP")
+        #m.Params.Method = 0
+        if verbose==0: m.Params.OutputFlag = 0
+
+        pi_i_y = m.addMVar((I,Y), lb=0.0)
+        pi_x_j = m.addMVar((X,J), lb=0.0)
+        pi_i_0 = m.addMVar(I, lb=0.0)
+        pi_0_j = m.addMVar(J, lb=0.0)
+
+        obj = pi_i_0.T @ self.eps_i_0 + pi_0_j.T @ self.eta_0_j + (pi_i_y * self.phi_i_y).sum() + (pi_x_j * self.psi_x_j).sum()
+        m.setObjective(obj, grb.GRB.MAXIMIZE)
+
+        m.addConstr( pi_i_0 + pi_i_y.sum(axis=1) == 1.0 )
+        m.addConstr( pi_0_j + pi_x_j.T.sum(axis=1) == 1.0 )
+        m.addConstr( self.delta_i_x.T @ pi_i_y == pi_x_j @ self.delta_j_y )
+
+        build_time = time.perf_counter() - t_start
+
+        m.optimize()
+
+        pi = np.array(m.x[:self.I*self.Y+self.X*self.J])
+        pi_i_y = pi[:self.I*self.Y].reshape((self.I,self.Y))
+        pi_x_j = pi[self.I*self.Y:].reshape((self.X,self.J))
+
+        t = time.perf_counter() - t_start
+        # print("\nTotal time:", t)
+
+        return pi_i_y, pi_x_j, t, build_time, m
+
+    def basic_feasible_solution(self):
+        for y in range(self.Y):
+            j = 0
+            while j < self.J and self.delta_j_y[j, y] == 0:
+                j += 1
+            if j == self.J:
+                raise ValueError(f"No man of type y = {y}")
+            self.X_j_x[j, :] = 1
+            # print(f"Type y = {y}: designated j_{y} = {j}")
+
+    def build_rmp(self, verbose=0):
+        m = grb.Model("RMP")
+        #m.Params.Method      = 0 # 0: primal simplex, 1: dual simplex, 2: barrier, ...
+        m.Params.LPWarmStart = 2 
+        m.Params.UpdateMode  = 1
+        if verbose==0: m.Params.OutputFlag = 0
+
+        # Objective
+        lambda_i_0 = m.addMVar(self.I, lb=0.0)
+        lambda_0_j = m.addMVar(self.J, lb=0.0)
+
+        ub_i_y = np.where(self.Y_i_y, grb.GRB.INFINITY, 0.0)      
+        ub_x_j = np.where(self.X_j_x.T, grb.GRB.INFINITY, 0.0)   
+        lambda_i_y = m.addMVar((self.I, self.Y), lb=0.0, ub=ub_i_y)
+        lambda_x_j = m.addMVar((self.X, self.J), lb=0.0, ub=ub_x_j)
+
+        obj = lambda_i_0.T @ self.eps_i_0 + lambda_0_j.T @ self.eta_0_j + (lambda_i_y * self.phi_i_y).sum() + (lambda_x_j * self.psi_x_j).sum()
+        m.setObjective(obj, grb.GRB.MAXIMIZE)
+
+        # Row constraints
+        m.addConstr( lambda_i_0 + lambda_i_y.sum(axis=1) == 1.0 )
+        m.addConstr( lambda_0_j + lambda_x_j.T.sum(axis=1) == 1.0 )
+
+        # Linking Constraints
+        m.addConstr( self.delta_i_x.T @ lambda_i_y == lambda_x_j @ self.delta_j_y )
+
+        return m, lambda_i_y, lambda_x_j
+    
+
+    def find_improved_reduced_cost(self, model, rc_tol=1e-6, verbose=0):
+        dual_vals = model.getAttr("Pi", model.getConstrs())[:(self.I + self.J + self.X*self.Y)]
+        u_i = np.array(dual_vals[:self.I])
+        v_j = np.array(dual_vals[self.I:self.I+self.J])
+        W_xy = np.array(dual_vals[self.I+self.J:self.I+self.J+self.X*self.Y]).reshape((self.X,self.Y))
+
+        new_columns_i_y, new_columns_j_x = [], []
+
+        for i in range(self.I):
+            best_rc, best_y = -np.inf, None
+            for y in range(self.Y):
+                if y not in self.Y_i_y[i,:].nonzero()[0]:
+                    rc = self.phi_i_y[i,y] - self.delta_i_x[i,:] @ W_xy[:,y] - u_i[i]
+                    #if rc > rc_tol:
+                    #    Y_i[i,y] = 1
+                    #    new_columns_i_y.append((i,y))
+                    if rc > best_rc:
+                        best_rc, best_y = rc, y
+                    if verbose>1: print(f"Agent i={i}, type y={y}. Reduced cost: {float(rc):.2f}.")
+
+            if best_rc > rc_tol:
+                self.Y_i_y[i,best_y] = 1
+                new_columns_i_y.append((i,best_y))
+                if verbose>0: print(f"Type y={best_y} entered choice set of i={i}. Reduced cost: {float(best_rc):.2f}.")
+
+        for j in range(self.J):
+            best_rc, best_x = -np.inf, None
+            for x in range(self.X):
+                if x not in self.X_j_x[j].nonzero()[0]:
+                    rc = self.psi_x_j[x,j] + self.delta_j_y[j,:] @ W_xy[x,:].T - v_j[j]
+                    #if rc > rc_tol:
+                    #    X_j[j,x] = 1
+                    #    new_columns_j_x.append((j,x))
+                    if rc > best_rc:
+                        best_rc, best_x = rc, x
+                    if verbose>1: print(f"Agent j={j}, type x={x}. Reduced cost: {float(rc):.2f}.")
+
+            if best_rc > rc_tol:
+                self.X_j_x[j,best_x] = 1
+                new_columns_j_x.append((j,best_x))
+                if verbose>0: print(f"Type x={best_x} entered choice set of j={j}. Reduced cost: {float(best_rc):.2f}.")
+
+        return new_columns_i_y, new_columns_j_x
+
+    def update_rmp(self, model, new_columns_i_y, new_columns_j_x, lambda_i_y, lambda_x_j):
+        for (i, y) in new_columns_i_y:
+            lambda_i_y[i, y].UB = grb.GRB.INFINITY
+        for (j, x) in new_columns_j_x:
+            lambda_x_j[x, j].UB = grb.GRB.INFINITY
+        return
+    
+    def column_generation(self, max_iter=100, rc_tol=1e-6, verbose=0):
+        start_time = time.perf_counter()  # Add timing
+        total_lp_iterations = 0           # Track LP iterations
+
+        rmp, lambda_i_y, lambda_x_j = self.build_rmp()
+        build_time = time.perf_counter() - start_time 
+
+        rmp.Params.OutputFlag = 0
+        rmp.optimize()
+
+        total_lp_iterations += rmp.IterCount  # Count initial solve
+        history = [rmp.ObjVal]
+        print(f"Iter 0: obj = {rmp.ObjVal:.6f}  (initial BFS)")
+
+        rmp.setParam("Presolve", 0)
+
+        for k in range(max_iter):
+            new_columns_i_y, new_columns_j_x = self.find_improved_reduced_cost(rmp, rc_tol=rc_tol)
+
+            if not new_columns_i_y and not new_columns_j_x:     # stop condition
+                print(f"Iter {k+1:2d}: no positive reduced cost – optimal.")
+                break
+
+            self.update_rmp(rmp, new_columns_i_y, new_columns_j_x, lambda_i_y, lambda_x_j)
+
+            # primal_var = rmp.getVars()
+            # last_sol = rmp.getAttr("X", primal_var)
+            # rmp.setAttr("Start", primal_var, last_sol)
+            rmp.optimize()
+            if verbose:
+                print("====")
+                print(rmp.ObjVal)
+            total_lp_iterations += rmp.IterCount  # Count iterations
+            history.append(rmp.ObjVal)
+
+        total_time = time.perf_counter() - start_time
+        total_vars = int(self.I + self.J + self.X_j_x.sum() + self.Y_i_y.sum())
+
+        return history, total_time, total_vars, total_lp_iterations, rmp, build_time
+
+
 class Dantzig_Wolfe:
     
     def __init__(self, Phi_x_y, eps_i_y, eta_x_j, eps_i_0, eta_0_j, delta_i_x, delta_j_y):
