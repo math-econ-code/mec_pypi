@@ -459,17 +459,41 @@ class Dantzig_Wolfe:
 
 class Dantzig_Wolfe_Estimation:
 
-    def __init__(self, mu_x_y, pi_i_y, pi_x_j, phi_x_y_k, x_i, y_j, eps_i_0=None, eta_0_j=None, eps_i_y=None, eta_x_j=None, seed=0):
-        self.I, self.J = len(x_i), len(y_j)
+    def __init__(self, mu_x_y, mu_x0, mu_0y, phi_x_y_k, eps_i_0=None, eta_0_j=None, eps_i_y=None, eta_x_j=None, seed=0):
+        self.I, self.J = len(eps_i_0), len(eta_0_j)
         self.X, self.Y, self.K = phi_x_y_k.shape
 
         self.mu_x_y = mu_x_y
-        self.pi_i_y, self.pi_x_j = pi_i_y, pi_x_j
-
         self.phi_x_y_k = phi_x_y_k
-        self.x_i, self.y_j = x_i, y_j
-        self.delta_i_x = np.eye(self.X)[x_i]
-        self.delta_j_y = np.eye(self.Y)[y_j]
+
+        # construct an individual matching pi_i_y and pi_x_j consistent with aggregate mu_x_y, mu_x0, mu_0y
+        n_x = mu_x_y.sum(axis=1) + mu_x0
+        m_y = mu_x_y.sum(axis=0) + mu_0y
+        
+        x_i = np.repeat(np.arange(self.X), n_x) # repeat 0 times n_x[0], 1 times n_x[1], etc.
+        y_j = np.repeat(np.arange(self.Y), m_y)
+
+        self.x_i = x_i
+        self.y_j = y_j
+        self.delta_i_x = np.eye(X)[x_i]
+        self.delta_j_y = np.eye(Y)[y_j]
+        
+        self.pi_i_y = np.zeros((self.I, self.Y))
+        self.pi_x_j = np.zeros((self.X, self.J))
+        
+        i = 0
+        for x in range(X):
+            for y in range(Y):
+                self.pi_i_y[i:(i+mu_x_y[x,y]),y] = 1
+                i += mu_x_y[x,y]
+            i += mu_x0[x]
+        
+        j = 0
+        for y in range(Y):
+            for x in range(X):
+                self.pi_x_j[x,j:(j+mu_x_y[x,y])] = 1
+                j += mu_x_y[x,y]
+            j += mu_0y[y]
 
         self.eps_i_0 = eps_i_0
         self.eta_0_j = eta_0_j
