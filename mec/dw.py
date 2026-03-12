@@ -475,22 +475,22 @@ class Dantzig_Wolfe_Estimation:
 
         self.x_i = x_i
         self.y_j = y_j
-        self.delta_i_x = np.eye(X)[x_i]
-        self.delta_j_y = np.eye(Y)[y_j]
+        self.delta_i_x = np.eye(self.X)[x_i]
+        self.delta_j_y = np.eye(self.Y)[y_j]
         
         self.pi_i_y = np.zeros((self.I, self.Y))
         self.pi_x_j = np.zeros((self.X, self.J))
         
         i = 0
-        for x in range(X):
-            for y in range(Y):
+        for x in range(self.X):
+            for y in range(self.Y):
                 self.pi_i_y[i:(i+mu_x_y[x,y]),y] = 1
                 i += mu_x_y[x,y]
             i += mu_x0[x]
         
         j = 0
-        for y in range(Y):
-            for x in range(X):
+        for y in range(self.Y):
+            for x in range(self.X):
                 self.pi_x_j[x,j:(j+mu_x_y[x,y])] = 1
                 j += mu_x_y[x,y]
             j += mu_0y[y]
