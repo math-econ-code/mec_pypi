@@ -4,7 +4,7 @@ import time
 import scipy.sparse as sp
 
 
-class Dantzig_Wolfe_vector_approach():
+class TUMatching_vector_approach():
     
     def __init__(self, Phi_x_y, eps_i_y, eta_x_j, eps_i_0, eta_0_j, delta_i_x, delta_j_y):
         
@@ -18,8 +18,8 @@ class Dantzig_Wolfe_vector_approach():
         self.x_i, self.y_j = delta_i_x.argmax(axis=1), delta_j_y.argmax(axis=1)
         self.delta_i_x, self.delta_j_y = sp.csr_matrix(delta_i_x), sp.csr_matrix(delta_j_y)
         
-        self.phi_i_y = Phi_x_y[self.x_i,:] / 2 + eps_i_y
-        self.psi_x_j = Phi_x_y[:,self.y_j] / 2 + eta_x_j
+        self.alpha_i_y = Phi_x_y[self.x_i,:] / 2 + eps_i_y
+        self.gamma_x_j = Phi_x_y[:,self.y_j] / 2 + eta_x_j
     
         
         self.Y_i_y, self.X_j_x = np.zeros((self.I, self.Y)), np.zeros((self.J, self.X))
@@ -27,41 +27,44 @@ class Dantzig_Wolfe_vector_approach():
             self.Phi_i_j = delta_i_x @ Phi_x_y @ delta_j_y.T + eps_i_y @ delta_j_y.T + delta_i_x @ eta_x_j
     
     def naive_solve(self, verbose=0):
+        '''Solve the pairwise marriage market without using type indifference.'''
         t_start = time.perf_counter()
 
         m = grb.Model("NaiveLP")
         if verbose==0: m.Params.OutputFlag = 0
 
-        pi_i_j = m.addMVar((I,J), lb=0.0)
-        pi_i_0 = m.addMVar(I, lb=0.0)
-        pi_0_j = m.addMVar(J, lb=0.0)
+        pi_i_j = m.addMVar((self.I,self.J), lb=0.0)
+        pi_i_0 = m.addMVar(self.I, lb=0.0)
+        pi_0_j = m.addMVar(self.J, lb=0.0)
 
-        m.setObjective( (pi_i_j * Phi_i_j).sum() + (pi_i_0 * self.eps_i_0).sum() + (pi_0_j * self.eta_0_j).sum(), grb.GRB.MAXIMIZE)
+        m.setObjective( (pi_i_j * self.Phi_i_j).sum() + (pi_i_0 * self.eps_i_0).sum() + (pi_0_j * self.eta_0_j).sum(), grb.GRB.MAXIMIZE)
         m.addConstr( pi_i_0 + pi_i_j.sum(axis=1) == 1.0 )
         m.addConstr( pi_0_j + pi_i_j.T.sum(axis=1) == 1.0 )
 
         m.optimize()
 
-        pi_i_j = np.array(m.x[:I*J]).reshape((I,J))
+        pi_i_j = np.array(m.x[:self.I*self.J]).reshape((self.I,self.J))
 
         t = time.perf_counter() - t_start
-        print("\nTotal time:", t)
+        if verbose > 0:
+            print("\nTotal time:", t)
 
         return pi_i_j, t, m
 
-    def unrestricted_solve(self, verbose=0):
+    def gurobi_solve(self, verbose=0):
+        '''Solve the full type-aggregated equilibrium where every agent can choose every partner type.'''
         t_start = time.perf_counter()
 
         m = grb.Model("UnrestrictedMP")
         #m.Params.Method = 0
         if verbose==0: m.Params.OutputFlag = 0
 
-        pi_i_y = m.addMVar((I,Y), lb=0.0)
-        pi_x_j = m.addMVar((X,J), lb=0.0)
-        pi_i_0 = m.addMVar(I, lb=0.0)
-        pi_0_j = m.addMVar(J, lb=0.0)
+        pi_i_y = m.addMVar((self.I,self.Y), lb=0.0)
+        pi_x_j = m.addMVar((self.X,self.J), lb=0.0)
+        pi_i_0 = m.addMVar(self.I, lb=0.0)
+        pi_0_j = m.addMVar(self.J, lb=0.0)
 
-        obj = pi_i_0.T @ self.eps_i_0 + pi_0_j.T @ self.eta_0_j + (pi_i_y * self.phi_i_y).sum() + (pi_x_j * self.psi_x_j).sum()
+        obj = pi_i_0.T @ self.eps_i_0 + pi_0_j.T @ self.eta_0_j + (pi_i_y * self.alpha_i_y).sum() + (pi_x_j * self.gamma_x_j).sum()
         m.setObjective(obj, grb.GRB.MAXIMIZE)
 
         m.addConstr( pi_i_0 + pi_i_y.sum(axis=1) == 1.0 )
@@ -82,6 +85,7 @@ class Dantzig_Wolfe_vector_approach():
         return pi_i_y, pi_x_j, t, build_time, m
 
     def basic_feasible_solution(self):
+        '''Seed the restricted market with one representative man per type who can meet any woman type.'''
         for y in range(self.Y):
             j = 0
             while j < self.J and self.delta_j_y[j, y] == 0:
@@ -92,39 +96,41 @@ class Dantzig_Wolfe_vector_approach():
             # print(f"Type y = {y}: designated j_{y} = {j}")
 
     def build_rmp(self, verbose=0):
-        m = grb.Model("RMP")
+        '''Build the restricted market where agents may only match with types already in their choice sets.'''
+        m = grb.Model("RestrictedMP")
         #m.Params.Method      = 0 # 0: primal simplex, 1: dual simplex, 2: barrier, ...
         m.Params.LPWarmStart = 2 
         m.Params.UpdateMode  = 1
         if verbose==0: m.Params.OutputFlag = 0
 
         # Objective
-        lambda_i_0 = m.addMVar(self.I, lb=0.0)
-        lambda_0_j = m.addMVar(self.J, lb=0.0)
+        pi_i_0 = m.addMVar(self.I, lb=0.0)
+        pi_0_j = m.addMVar(self.J, lb=0.0)
 
         ub_i_y = np.where(self.Y_i_y, grb.GRB.INFINITY, 0.0)      
         ub_x_j = np.where(self.X_j_x.T, grb.GRB.INFINITY, 0.0)   
-        lambda_i_y = m.addMVar((self.I, self.Y), lb=0.0, ub=ub_i_y)
-        lambda_x_j = m.addMVar((self.X, self.J), lb=0.0, ub=ub_x_j)
+        pi_i_y = m.addMVar((self.I, self.Y), lb=0.0, ub=ub_i_y)
+        pi_x_j = m.addMVar((self.X, self.J), lb=0.0, ub=ub_x_j)
 
-        obj = lambda_i_0.T @ self.eps_i_0 + lambda_0_j.T @ self.eta_0_j + (lambda_i_y * self.phi_i_y).sum() + (lambda_x_j * self.psi_x_j).sum()
+        obj = pi_i_0.T @ self.eps_i_0 + pi_0_j.T @ self.eta_0_j + (pi_i_y * self.alpha_i_y).sum() + (pi_x_j * self.gamma_x_j).sum()
         m.setObjective(obj, grb.GRB.MAXIMIZE)
 
         # Row constraints
-        m.addConstr( lambda_i_0 + lambda_i_y.sum(axis=1) == 1.0 )
-        m.addConstr( lambda_0_j + lambda_x_j.T.sum(axis=1) == 1.0 )
+        m.addConstr( pi_i_0 + pi_i_y.sum(axis=1) == 1.0 )
+        m.addConstr( pi_0_j + pi_x_j.T.sum(axis=1) == 1.0 )
 
         # Linking Constraints
-        m.addConstr( self.delta_i_x.T @ lambda_i_y == lambda_x_j @ self.delta_j_y )
+        m.addConstr( self.delta_i_x.T @ pi_i_y == pi_x_j @ self.delta_j_y )
 
-        return m, lambda_i_y, lambda_x_j
+        return m, pi_i_y, pi_x_j
     
 
     def find_improved_reduced_cost(self, model, rc_tol=1e-6, verbose=0):
+        '''Ask each agent whether some excluded type beats their current supported utility.'''
         dual_vals = model.getAttr("Pi", model.getConstrs())[:(self.I + self.J + self.X*self.Y)]
         u_i = np.array(dual_vals[:self.I])
         v_j = np.array(dual_vals[self.I:self.I+self.J])
-        W_xy = np.array(dual_vals[self.I+self.J:self.I+self.J+self.X*self.Y]).reshape((self.X,self.Y))
+        t_x_y = np.array(dual_vals[self.I+self.J:self.I+self.J+self.X*self.Y]).reshape((self.X,self.Y))
 
         new_columns_i_y, new_columns_j_x = [], []
 
@@ -132,7 +138,7 @@ class Dantzig_Wolfe_vector_approach():
             best_rc, best_y = -np.inf, None
             for y in range(self.Y):
                 if y not in self.Y_i_y[i,:].nonzero()[0]:
-                    rc = self.phi_i_y[i,y] - self.delta_i_x[i,:] @ W_xy[:,y] - u_i[i]
+                    rc = self.alpha_i_y[i,y] - self.delta_i_x[i,:] @ t_x_y[:,y] - u_i[i]
                     #if rc > rc_tol:
                     #    Y_i[i,y] = 1
                     #    new_columns_i_y.append((i,y))
@@ -149,7 +155,7 @@ class Dantzig_Wolfe_vector_approach():
             best_rc, best_x = -np.inf, None
             for x in range(self.X):
                 if x not in self.X_j_x[j].nonzero()[0]:
-                    rc = self.psi_x_j[x,j] + self.delta_j_y[j,:] @ W_xy[x,:].T - v_j[j]
+                    rc = self.gamma_x_j[x,j] + self.delta_j_y[j,:] @ t_x_y[x,:].T - v_j[j]
                     #if rc > rc_tol:
                     #    X_j[j,x] = 1
                     #    new_columns_j_x.append((j,x))
@@ -164,18 +170,20 @@ class Dantzig_Wolfe_vector_approach():
 
         return new_columns_i_y, new_columns_j_x
 
-    def update_rmp(self, model, new_columns_i_y, new_columns_j_x, lambda_i_y, lambda_x_j):
+    def update_rmp(self, model, new_columns_i_y, new_columns_j_x, pi_i_y, pi_x_j):
+        '''Open the newly desired type options inside the restricted market.'''
         for (i, y) in new_columns_i_y:
-            lambda_i_y[i, y].UB = grb.GRB.INFINITY
+            pi_i_y[i, y].UB = grb.GRB.INFINITY
         for (j, x) in new_columns_j_x:
-            lambda_x_j[x, j].UB = grb.GRB.INFINITY
+            pi_x_j[x, j].UB = grb.GRB.INFINITY
         return
     
-    def column_generation(self, max_iter=100, rc_tol=1e-6, verbose=0):
+    def rroa_solve(self, max_iter=100, rc_tol=1e-6, verbose=0):
+        '''Expand choice sets until no agent wants a missing type at the current transfers.'''
         start_time = time.perf_counter()  # Add timing
         total_lp_iterations = 0           # Track LP iterations
 
-        rmp, lambda_i_y, lambda_x_j = self.build_rmp()
+        rmp, pi_i_y, pi_x_j = self.build_rmp()
         build_time = time.perf_counter() - start_time 
 
         rmp.Params.OutputFlag = 0
@@ -183,7 +191,8 @@ class Dantzig_Wolfe_vector_approach():
 
         total_lp_iterations += rmp.IterCount  # Count initial solve
         history = [rmp.ObjVal]
-        print(f"Iter 0: obj = {rmp.ObjVal:.6f}  (initial BFS)")
+        if verbose > 0:
+            print(f"Iter 0: obj = {rmp.ObjVal:.6f}  (initial BFS)")
 
         rmp.setParam("Presolve", 0)
 
@@ -191,10 +200,11 @@ class Dantzig_Wolfe_vector_approach():
             new_columns_i_y, new_columns_j_x = self.find_improved_reduced_cost(rmp, rc_tol=rc_tol)
 
             if not new_columns_i_y and not new_columns_j_x:     # stop condition
-                print(f"Iter {k+1:2d}: no positive reduced cost – optimal.")
+                if verbose > 0:
+                    print(f"Iter {k+1:2d}: no positive reduced cost – optimal.")
                 break
 
-            self.update_rmp(rmp, new_columns_i_y, new_columns_j_x, lambda_i_y, lambda_x_j)
+            self.update_rmp(rmp, new_columns_i_y, new_columns_j_x, pi_i_y, pi_x_j)
 
             # primal_var = rmp.getVars()
             # last_sol = rmp.getAttr("X", primal_var)
@@ -211,8 +221,7 @@ class Dantzig_Wolfe_vector_approach():
 
         return history, total_time, total_vars, total_lp_iterations, rmp, build_time
 
-
-class Dantzig_Wolfe:
+class TUMatching:
     
     def __init__(self, Phi_x_y, eps_i_y, eta_x_j, eps_i_0, eta_0_j, delta_i_x, delta_j_y):
         self.I, self.Y = eps_i_y.shape
@@ -225,14 +234,15 @@ class Dantzig_Wolfe:
         self.x_i, self.y_j = delta_i_x.argmax(axis=1), delta_j_y.argmax(axis=1)
         self.delta_i_x, self.delta_j_y = sp.csr_matrix(delta_i_x), sp.csr_matrix(delta_j_y)
         
-        self.phi_i_y = Phi_x_y[self.x_i,:] / 2 + eps_i_y
-        self.psi_x_j = Phi_x_y[:,self.y_j] / 2 + eta_x_j
+        self.alpha_i_y = Phi_x_y[self.x_i,:] / 2 + eps_i_y
+        self.gamma_x_j = Phi_x_y[:,self.y_j] / 2 + eta_x_j
         
         self.Y_i_y = {i: set() for i in range(self.I)}
         self.X_j_x = {j: set() for j in range(self.J)}
         
         
-    def unrestricted_solve(self, verbose=0):
+    def gurobi_solve(self, verbose=0):
+        '''Solve the full type-aggregated equilibrium where every agent can choose every partner type.'''
         t_start = time.perf_counter()
 
         m = grb.Model("UnrestrictedMP")
@@ -243,7 +253,7 @@ class Dantzig_Wolfe:
         pi_i_0 = m.addMVar(self.I, lb=0.0)
         pi_0_j = m.addMVar(self.J, lb=0.0)
 
-        obj = pi_i_0.T @ self.eps_i_0 + pi_0_j.T @ self.eta_0_j + (pi_i_y * self.phi_i_y).sum() + (pi_x_j * self.psi_x_j).sum()
+        obj = pi_i_0.T @ self.eps_i_0 + pi_0_j.T @ self.eta_0_j + (pi_i_y * self.alpha_i_y).sum() + (pi_x_j * self.gamma_x_j).sum()
         m.setObjective(obj, grb.GRB.MAXIMIZE)
 
         m.addConstr( pi_i_0 + pi_i_y.sum(axis=1) == 1.0 )
@@ -259,12 +269,14 @@ class Dantzig_Wolfe:
         pi_x_j = pi[self.I*self.Y:].reshape((self.X, self.J))
 
         t = time.perf_counter() - t_start
-        print("\nTotal time:", t)
+        if verbose > 0:
+            print("\nTotal time:", t)
 
         return pi_i_y, pi_x_j, t, build_time, m
 
         
     def basic_feasible_solution(self, verbose=0):
+        '''Seed the restricted market with one representative man per type who can meet any woman type.'''
         for y in range(self.Y):
             j = 0
             while j < self.J and self.y_j[j] != y:
@@ -277,7 +289,8 @@ class Dantzig_Wolfe:
                 
                 
     def build_rmp(self, verbose=0):
-        m = grb.Model("RMP")
+        '''Build the restricted market where agents may only match with types already in their choice sets.'''
+        m = grb.Model("RestrictedMP")
         m.Params.OutputFlag  = verbose > 0
         m.Params.UpdateMode  = 1
         
@@ -285,28 +298,28 @@ class Dantzig_Wolfe:
 
         row_i, row_j, linking_x_y = {}, {}, {}
 
-        lambda_i_0, lambda_i_y = {}, {}
+        pi_i_0, pi_i_y = {}, {}
         for i in range(self.I):
-            lambda_i_0[i] = m.addVar(obj=self.eps_i_0[i], lb=0.0)
-            row_i[i] = m.addConstr(lambda_i_0[i] == 1.0, name=f"row_i_{i}")
+            pi_i_0[i] = m.addVar(obj=self.eps_i_0[i], lb=0.0)
+            row_i[i] = m.addConstr(pi_i_0[i] == 1.0, name=f"row_i_{i}")
             for y in self.Y_i_y[i]:
                 col = grb.Column()
                 col.addTerms(1.0, row_i[i])
-                lambda_i_y[i,y] = m.addVar(obj=self.phi_i_y[i,y], lb=0.0, column=col, name=f"L_{i}_{y}")
+                pi_i_y[i,y] = m.addVar(obj=self.alpha_i_y[i,y], lb=0.0, column=col, name=f"L_{i}_{y}")
 
-        lambda_0_j, lambda_x_j = {}, {}
+        pi_0_j, pi_x_j = {}, {}
         for j in range(self.J):
-            lambda_0_j[j] = m.addVar(obj=self.eta_0_j[j], lb=0.0)
-            row_j[j] = m.addConstr(lambda_0_j[j] == 1.0, name=f"row_j_{j}")
+            pi_0_j[j] = m.addVar(obj=self.eta_0_j[j], lb=0.0)
+            row_j[j] = m.addConstr(pi_0_j[j] == 1.0, name=f"row_j_{j}")
             y = self.y_j[j].item()
             for x in self.X_j_x[j]:
                 col = grb.Column()
                 col.addTerms(1.0, row_j[j])
-                lambda_x_j[x,j] = m.addVar(obj=self.psi_x_j[x,j], lb=0.0, column=col, name=f"R_{x}_{j}")
-                linking_x_y[x,y] = m.addConstr(-lambda_x_j[x,j] == 0.0, name=f"linking_{x}_{y}")
+                pi_x_j[x,j] = m.addVar(obj=self.gamma_x_j[x,j], lb=0.0, column=col, name=f"R_{x}_{j}")
+                linking_x_y[x,y] = m.addConstr(-pi_x_j[x,j] == 0.0, name=f"linking_{x}_{y}")
 
-        self.lambda_i_0, self.lambda_i_y = lambda_i_0, lambda_i_y
-        self.lambda_0_j, self.lambda_x_j = lambda_0_j, lambda_x_j
+        self.pi_i_0, self.pi_i_y = pi_i_0, pi_i_y
+        self.pi_0_j, self.pi_x_j = pi_0_j, pi_x_j
         self.row_i, self.row_j, self.linking_x_y = row_i, row_j, linking_x_y
         self.m = m
 
@@ -314,19 +327,20 @@ class Dantzig_Wolfe:
 
   
     def find_improved_reduced_cost(self, rc_tol=1e-6, verbose=0, topk=1):
+        '''Ask each agent which excluded type would most improve their supported utility.'''
     
         u = np.array(self.m.getAttr("Pi", list(self.row_i.values())))  # (I,)
         v = np.array(self.m.getAttr("Pi", list(self.row_j.values())))  # (J,)
 
-        # Build W[x,y] from linking constraints
+        # Build t[x,y] from linking constraints.
         keys = list(self.linking_x_y.keys())  
         if keys:
             pis = np.array(self.m.getAttr("Pi", [self.linking_x_y[k] for k in keys]))
             xs, ys = zip(*keys)
-            W = np.zeros((self.X, self.Y), dtype=np.float32)
-            W[np.array(xs), np.array(ys)] = pis
+            t_x_y = np.zeros((self.X, self.Y), dtype=np.float32)
+            t_x_y[np.array(xs), np.array(ys)] = pis
         else:
-            W = np.zeros((self.X, self.Y), dtype=np.float32)
+            t_x_y = np.zeros((self.X, self.Y), dtype=np.float32)
 
         
         chosen_i_y = np.zeros((self.I, self.Y), dtype=bool)
@@ -339,10 +353,10 @@ class Dantzig_Wolfe:
             if S:
                 chosen_x_j[list(S), j] = True
 
-        rc_i = self.phi_i_y.astype(np.float32) - W[self.x_i, :] - u[:, None]
+        rc_i = self.alpha_i_y.astype(np.float32) - t_x_y[self.x_i, :] - u[:, None]
         rc_i[chosen_i_y] = -np.inf  # Block columns already in RMP
 
-        rc_j = self.psi_x_j.astype(np.float32) + W[:, self.y_j] - v[None, :]
+        rc_j = self.gamma_x_j.astype(np.float32) + t_x_y[:, self.y_j] - v[None, :]
         rc_j[chosen_x_j] = -np.inf
 
         new_columns_i_y, new_columns_j_x = [], []
@@ -399,22 +413,24 @@ class Dantzig_Wolfe:
 
 
     def update_rmp(self, new_columns_i_y, new_columns_j_x):
+        '''Add the newly desired type options as feasible matches in the restricted market.'''
         for (i, y) in new_columns_i_y:
             x = self.x_i[i].item()
             col = grb.Column()
             col.addTerms(1.0, self.row_i[i])
             col.addTerms(1.0, self.linking_x_y[x,y])
-            self.lambda_i_y[i,y] = self.m.addVar(obj=self.phi_i_y[i,y], lb=0.0, column=col, name=f"L_{i}_{y}")
+            self.pi_i_y[i,y] = self.m.addVar(obj=self.alpha_i_y[i,y], lb=0.0, column=col, name=f"L_{i}_{y}")
         for (j, x) in new_columns_j_x:
             y = self.y_j[j].item()
             col = grb.Column()
             col.addTerms(1.0, self.row_j[j])
             col.addTerms(-1.0, self.linking_x_y[x,y])
-            self.lambda_x_j[x,j] = self.m.addVar(obj=self.psi_x_j[x,j], lb=0.0, column=col, name=f"R_{x}_{j}")
+            self.pi_x_j[x,j] = self.m.addVar(obj=self.gamma_x_j[x,j], lb=0.0, column=col, name=f"R_{x}_{j}")
         return
     
 
-    def column_generation(self, max_iter=100, rc_tol=1e-6, verbose=0):
+    def rroa_solve(self, max_iter=100, rc_tol=1e-6, verbose=0):
+        '''Repeatedly solve the restricted market until transfers make all missing choices unattractive.'''
         start_time = time.perf_counter()  # Add timing
         total_lp_iterations = 0           # Track LP iterations
 
@@ -428,7 +444,8 @@ class Dantzig_Wolfe:
 
         total_lp_iterations += self.m.IterCount  # Count initial solve
         history = [self.m.ObjVal]
-        print(f"Iter 0: obj = {self.m.ObjVal:.6f}  (initial BFS)")
+        if verbose > 0:
+            print(f"Iter 0: obj = {self.m.ObjVal:.6f}  (initial BFS)")
 
         self.m.setParam("Presolve", 0)
         self.m.Params.LPWarmStart = 2
@@ -437,7 +454,8 @@ class Dantzig_Wolfe:
             new_columns_i_y, new_columns_j_x = self.find_improved_reduced_cost(rc_tol=rc_tol)
 
             if not new_columns_i_y and not new_columns_j_x:     # stop condition
-                print(f"Iter {k+1:2d}: no positive reduced cost – optimal.")
+                if verbose > 0:
+                    print(f"Iter {k+1:2d}: no positive reduced cost – optimal.")
                 break
 
             self.update_rmp(new_columns_i_y, new_columns_j_x)
@@ -455,9 +473,9 @@ class Dantzig_Wolfe:
         return history, total_time, total_vars, total_lp_iterations, build_time, self.m
 
 
-# Dantzig_Wolfe_Estimation class: Reverse problem, dictionary approach
+# TUMatchingEstimation class: reverse problem, dictionary approach.
 
-class Dantzig_Wolfe_Estimation:
+class TUMatchingEstimation:
 
     def __init__(self, mu_x_y, mu_x0, mu_0y, phi_x_y_k, eps_i_0=None, eta_0_j=None, eps_i_y=None, eta_x_j=None, seed=0):
         self.I, self.J = len(eps_i_0), len(eta_0_j)
@@ -514,6 +532,7 @@ class Dantzig_Wolfe_Estimation:
 
 
     def unrestricted_solve(self, verbose=0):
+        '''Solve the simulated inverse market with moment prices chosen to support the observed matching.'''
         t_start = time.perf_counter()
 
         m = grb.Model("UnrestrictedMP")
@@ -541,12 +560,14 @@ class Dantzig_Wolfe_Estimation:
         self.m = m
         lambda_k = np.array(m.Pi[-self.K:])
         t = time.perf_counter() - t_start
-        print("\nTotal time:", t)
+        if verbose > 0:
+            print("\nTotal time:", t)
 
         return lambda_k, t, build_time, m
 
   
     def basic_feasible_solution(self):
+        '''Start the simulated inverse market from the observed aggregate matches and singles.'''
         idx_i_by_x = [list(np.where(self.x_i == x)[0]) for x in range(self.X)]
         idx_j_by_y = [list(np.where(self.y_j == y)[0]) for y in range(self.Y)]
 
@@ -585,7 +606,8 @@ class Dantzig_Wolfe_Estimation:
 
   
     def build_rmp(self, verbose=0):
-        m = grb.Model("RMP")
+        '''Build the restricted simulated market around current choices and moment constraints.'''
+        m = grb.Model("RestrictedMP")
         m.Params.OutputFlag = verbose > 0
         m.Params.UpdateMode = 1
 
@@ -671,11 +693,12 @@ class Dantzig_Wolfe_Estimation:
 
   
     def find_improved_reduced_cost(self, rc_tol=1e-6, verbose=0):
+        '''Ask simulated agents whether missing choices improve utility at current transfers and moment prices.'''
         u_i = {i: self.row_i[i].Pi for i in range(self.I)}
         v_j = {j: self.row_j[j].Pi for j in range(self.J)}
-        W_x_y = np.zeros((self.X, self.Y)) # matrix access is faster than dictionary for this size
+        t_x_y = np.zeros((self.X, self.Y)) # matrix access is faster than dictionary for this size
         for a in self.linking_x_y:
-            W_x_y[a] = self.linking_x_y[a].Pi
+            t_x_y[a] = self.linking_x_y[a].Pi
         lambda_k = -np.array([self.linking_k[k].Pi for k in range(self.K)])
 
         new_columns_i_y, new_columns_j_x = [], []
@@ -683,7 +706,7 @@ class Dantzig_Wolfe_Estimation:
         Phi_lambda_x_y = self.phi_x_y_k @ lambda_k
 
         Y_i_y_cached = self.Y_i_y
-        U_i_y_cached = self.delta_i_x @ (Phi_lambda_x_y / 2 - W_x_y) + self.eps_i_y
+        U_i_y_cached = self.delta_i_x @ (Phi_lambda_x_y / 2 - t_x_y) + self.eps_i_y
         for i in range(self.I):
             x = self.x_i[i].item()
             Y_i = np.ones(self.Y, dtype=bool)
@@ -711,7 +734,7 @@ class Dantzig_Wolfe_Estimation:
                 if verbose > 1: print(f"Type y={best_y} entered choice set of i={i}. Reduced cost: {best_rc:.2f}.")
 
         X_j_x_cached = self.X_j_x
-        V_x_j_cached = (Phi_lambda_x_y / 2 + W_x_y) @ self.delta_j_y.T + self.eta_x_j
+        V_x_j_cached = (Phi_lambda_x_y / 2 + t_x_y) @ self.delta_j_y.T + self.eta_x_j
         for j in range(self.J):
             y = self.y_j[j].item()
             X_j = np.ones(self.X, dtype=bool)
@@ -742,6 +765,7 @@ class Dantzig_Wolfe_Estimation:
 
   
     def update_rmp(self, new_columns_i_y, new_columns_j_x):
+        '''Add simulated choices that would improve the restricted inverse market.'''
         for (i, y) in new_columns_i_y:
             if y is None:
                 col = grb.Column()
@@ -771,7 +795,8 @@ class Dantzig_Wolfe_Estimation:
         return
 
   
-    def column_generation(self, max_iter=100, rc_tol=1e-6):
+    def rroa_solve(self, max_iter=100, rc_tol=1e-6, verbose=0):
+        '''Expand the simulated inverse market until no missing choice can improve it.'''
         start_time = time.perf_counter()  # Add timing
         total_lp_iterations = 0  # Track LP iterations
 
@@ -802,7 +827,8 @@ class Dantzig_Wolfe_Estimation:
 
         total_lp_iterations += self.m.IterCount  # Count initial solve
         history = [self.m.ObjVal]
-        print(f"Iter 0: obj = {self.m.ObjVal:.6f}  (initial BFS)")
+        if verbose > 0:
+            print(f"Iter 0: obj = {self.m.ObjVal:.6f}  (initial BFS)")
 
         self.m.setParam("Presolve", 0)
         self.m.Params.LPWarmStart = 2
@@ -811,14 +837,16 @@ class Dantzig_Wolfe_Estimation:
             new_columns_i_y, new_columns_j_x = self.find_improved_reduced_cost(rc_tol=rc_tol)
 
             if not new_columns_i_y and not new_columns_j_x:  # stop condition
-                print(f"Iter {iter + 1:2d}: no positive reduced cost – optimal.")
+                if verbose > 0:
+                    print(f"Iter {iter + 1:2d}: no positive reduced cost – optimal.")
                 break
 
             self.update_rmp(new_columns_i_y, new_columns_j_x)
 
             self.m.optimize()
-            print("====")
-            print(self.m.ObjVal)
+            if verbose > 0:
+                print("====")
+                print(self.m.ObjVal)
             total_lp_iterations += self.m.IterCount  # Count iterations
             history.append(self.m.ObjVal)
 
@@ -830,29 +858,30 @@ class Dantzig_Wolfe_Estimation:
 
 # Visualization tools
 
-def visualize_results(unr_list, dw_list):
+def visualize_results(unr_list, rroa_list):
+    '''Compare the unrestricted and restricted markets to see whether they support the same surplus.'''
     _, _, t_unr, build_unr, m_unr = unr_list
     
-    history_dict, dw_time, dw_vars, dw_iterations, build_dw, dw_model = dw_list
-    dw_obj = history_dict[-1] if history_dict else 0
+    history_dict, rroa_time, rroa_vars, rroa_iterations, build_rroa, rroa_model = rroa_list
+    rroa_obj = history_dict[-1] if history_dict else 0
     
     if m_unr.Status == grb.GRB.OPTIMAL:
         obj_unr = m_unr.ObjVal
-        obj_diff = abs(obj_unr - dw_obj)
-        print(f"Objective values: BF={obj_unr:.6f}, DW={dw_obj:.6f}")
+        obj_diff = abs(obj_unr - rroa_obj)
+        print(f"Objective values: BF={obj_unr:.6f}, RROA={rroa_obj:.6f}")
         print(f"\nMetrics comparison (from feedback):")
 
-        print(f"{'Metric':<25} {'Full-column LP':<20} {'Dantzig-Wolfe':<20} {'Ratio/Speedup':<15}")
+        print(f"{'Metric':<25} {'Full-column LP':<20} {'RROA':<20} {'Ratio/Speedup':<15}")
         print("-" * 80)
-        print(f"{'Build time (s)':<25} {build_unr:<20.3f} {build_dw:<20.3f} {build_unr/build_dw:<15.2f}")
-        print(f"{'Solve time (s)':<25} {t_unr:<20.3f} {dw_time:<20.3f} {t_unr/dw_time:<15.2f}")
+        print(f"{'Build time (s)':<25} {build_unr:<20.3f} {build_rroa:<20.3f} {build_unr/build_rroa:<15.2f}")
+        print(f"{'Solve time (s)':<25} {t_unr:<20.3f} {rroa_time:<20.3f} {t_unr/rroa_time:<15.2f}")
 
-        print(f"{'Iter (LP iterations)':<25} {int(m_unr.IterCount):<20d} {int(dw_iterations):<20d} {int(m_unr.IterCount)/int(dw_iterations):<15}")
-        print(f"{'N_col (variables)':<25} {m_unr.NumVars:<20d} {dw_vars:<20d} {m_unr.NumVars/dw_vars:<15.1f}")
+        print(f"{'Iter (LP iterations)':<25} {int(m_unr.IterCount):<20d} {int(rroa_iterations):<20d} {int(m_unr.IterCount)/int(rroa_iterations):<15}")
+        print(f"{'N_col (variables)':<25} {m_unr.NumVars:<20d} {rroa_vars:<20d} {m_unr.NumVars/rroa_vars:<15.1f}")
         if obj_diff < 1e-6:
-            print(f"{'Obj (optimal value)':<25} {obj_unr:<20.6f} {dw_obj:<20.6f} {'Match':<15}")
+            print(f"{'Obj (optimal value)':<25} {obj_unr:<20.6f} {rroa_obj:<20.6f} {'Match':<15}")
         else:
-            print(f"{'Obj (optimal value)':<25} {obj_unr:<20.6f} {dw_obj:<20.6f} {'Mismatch':<15}")
+            print(f"{'Obj (optimal value)':<25} {obj_unr:<20.6f} {rroa_obj:<20.6f} {'Mismatch':<15}")
     else:
         print(f"Failed to solve! Status: {m_unr.Status}")
         obj_unr = None
@@ -867,7 +896,7 @@ def visualize_results(unr_list, dw_list):
 
         plt.figure(figsize=(10, 6))
         s = pd.Series(history_dict)
-        s.plot(title="Dantzig–Wolfe Convergence", xlabel="Iteration", ylabel="Objective Value", marker='o', linewidth=2)
+        s.plot(title="RROA Convergence", xlabel="Iteration", ylabel="Objective Value", marker='o', linewidth=2)
         plt.axhline(y=obj_unr, color='r', linestyle='--', label='Optimal (Full-column LP)', alpha=0.7)
         plt.legend()
         plt.grid(True, alpha=0.3)
