@@ -289,12 +289,6 @@ class Tableau(LP):
                 return k
         return None # if no entering variable found, None returned
 
-    #def determine_departing(self, kent): # Alfred
-    #    thedic = {self.k_b[b]: self.tableau[self.i_b[b],-1] / self.tableau[self.i_b[b],kent]
-    #              for b in range(self.nbi) if self.tableau[self.i_b[b],kent]>0}
-    #    kdep = min(thedic, key = thedic.get)
-    #    return kdep
-
     def determine_departing(self, kent):
         runmin, kdep = float('inf'), None
         for b in range(self.nbi):
@@ -319,7 +313,7 @@ class Tableau(LP):
             self.display()
         kent = self.determine_entering()
         if kent is not None:
-            kdep= self.determine_departing(kent)
+            kdep = self.determine_departing(kent)
             if verbose>0:
                 bdep = int(np.where(self.k_b == kdep)[0])
                 print('Entering=', self.names_all_variables[kent], 'Departing=',self.names_all_variables[self.i_b[bdep]],'Pivot=',(self.i_b[bdep],kent))
@@ -329,7 +323,7 @@ class Tableau(LP):
                 print ('Optimal solution found.')
             if verbose>1:
                 self.display()
-        return (kent is not None) # returns false  if optimal solution; true otherwise
+        return (kent is not None) # returns false if optimal solution; true otherwise
 
     def simplex_solve(self,verbose=0):
         if self.b_i.min()<0:
@@ -351,6 +345,7 @@ class Tableau(LP):
             return x_j, y_i, x_j @ self.c_j
         else:
             return x_j, y_i, None
+
 
 ##########################################
 ######### Interior Point Methods #########
