@@ -261,7 +261,7 @@ class TUMatching:
 
         total_time = time.perf_counter() - start_time
         total_vars = int(self.I + self.J + self.X_j_x.sum() + self.Y_i_y.sum())
-ß
+
         return history, total_time, total_vars, total_lp_iterations, build_time, self.m
 
 
