@@ -4,222 +4,19 @@ import time
 import scipy.sparse as sp
 
 
-class TUMatching_vector_approach():
-    
-    def __init__(self, Phi_x_y, eps_i_y, eta_x_j, eps_i_0, eta_0_j, delta_i_x, delta_j_y):
-        
-        self.I, self.Y = eps_i_y.shape
-        self.X, self.J = eta_x_j.shape
-        
-        self.Phi_x_y = Phi_x_y
-        self.eps_i_y, self.eps_i_0 = eps_i_y, eps_i_0
-        self.eta_x_j, self.eta_0_j = eta_x_j, eta_0_j
-        
-        self.x_i, self.y_j = delta_i_x.argmax(axis=1), delta_j_y.argmax(axis=1)
-        self.delta_i_x, self.delta_j_y = sp.csr_matrix(delta_i_x), sp.csr_matrix(delta_j_y)
-        
-        self.alpha_i_y = Phi_x_y[self.x_i,:] / 2 + eps_i_y
-        self.gamma_x_j = Phi_x_y[:,self.y_j] / 2 + eta_x_j
-    
-        
-        self.Y_i_y, self.X_j_x = np.zeros((self.I, self.Y)), np.zeros((self.J, self.X))
-        if self.I* self.J < 1e9:
-            self.Phi_i_j = delta_i_x @ Phi_x_y @ delta_j_y.T + eps_i_y @ delta_j_y.T + delta_i_x @ eta_x_j
-    
-    def naive_solve(self, verbose=0):
-        '''Solve the pairwise marriage market without using type indifference.'''
-        t_start = time.perf_counter()
+def _as_integer_counts(name, values, tol=1e-6):
+    values = np.asarray(values)
+    rounded = np.rint(values)
+    if np.any(values < -tol):
+        raise ValueError(f"{name} contains negative counts.")
+    if not np.all(np.abs(values - rounded) <= tol):
+        raise ValueError(f"{name} must contain integer counts.")
+    counts = rounded.astype(int)
+    if np.any(counts < 0):
+        raise ValueError(f"{name} contains negative counts.")
+    return counts
 
-        m = grb.Model("NaiveLP")
-        if verbose==0: m.Params.OutputFlag = 0
 
-        pi_i_j = m.addMVar((self.I,self.J), lb=0.0)
-        pi_i_0 = m.addMVar(self.I, lb=0.0)
-        pi_0_j = m.addMVar(self.J, lb=0.0)
-
-        m.setObjective( (pi_i_j * self.Phi_i_j).sum() + (pi_i_0 * self.eps_i_0).sum() + (pi_0_j * self.eta_0_j).sum(), grb.GRB.MAXIMIZE)
-        m.addConstr( pi_i_0 + pi_i_j.sum(axis=1) == 1.0 )
-        m.addConstr( pi_0_j + pi_i_j.T.sum(axis=1) == 1.0 )
-
-        m.optimize()
-
-        pi_i_j = np.array(m.x[:self.I*self.J]).reshape((self.I,self.J))
-
-        t = time.perf_counter() - t_start
-        if verbose > 0:
-            print("\nTotal time:", t)
-
-        return pi_i_j, t, m
-
-    def gurobi_solve(self, verbose=0):
-        '''Solve the full type-aggregated equilibrium where every agent can choose every partner type.'''
-        t_start = time.perf_counter()
-
-        m = grb.Model("UnrestrictedMP")
-        #m.Params.Method = 0
-        if verbose==0: m.Params.OutputFlag = 0
-
-        pi_i_y = m.addMVar((self.I,self.Y), lb=0.0)
-        pi_x_j = m.addMVar((self.X,self.J), lb=0.0)
-        pi_i_0 = m.addMVar(self.I, lb=0.0)
-        pi_0_j = m.addMVar(self.J, lb=0.0)
-
-        obj = pi_i_0.T @ self.eps_i_0 + pi_0_j.T @ self.eta_0_j + (pi_i_y * self.alpha_i_y).sum() + (pi_x_j * self.gamma_x_j).sum()
-        m.setObjective(obj, grb.GRB.MAXIMIZE)
-
-        m.addConstr( pi_i_0 + pi_i_y.sum(axis=1) == 1.0 )
-        m.addConstr( pi_0_j + pi_x_j.T.sum(axis=1) == 1.0 )
-        m.addConstr( self.delta_i_x.T @ pi_i_y == pi_x_j @ self.delta_j_y )
-
-        build_time = time.perf_counter() - t_start
-
-        m.optimize()
-
-        pi = np.array(m.x[:self.I*self.Y+self.X*self.J])
-        pi_i_y = pi[:self.I*self.Y].reshape((self.I,self.Y))
-        pi_x_j = pi[self.I*self.Y:].reshape((self.X,self.J))
-
-        t = time.perf_counter() - t_start
-        # print("\nTotal time:", t)
-
-        return pi_i_y, pi_x_j, t, build_time, m
-
-    def basic_feasible_solution(self):
-        '''Seed the restricted market with one representative man per type who can meet any woman type.'''
-        for y in range(self.Y):
-            j = 0
-            while j < self.J and self.delta_j_y[j, y] == 0:
-                j += 1
-            if j == self.J:
-                raise ValueError(f"No man of type y = {y}")
-            self.X_j_x[j, :] = 1
-            # print(f"Type y = {y}: designated j_{y} = {j}")
-
-    def build_rmp(self, verbose=0):
-        '''Build the restricted market where agents may only match with types already in their choice sets.'''
-        m = grb.Model("RestrictedMP")
-        #m.Params.Method      = 0 # 0: primal simplex, 1: dual simplex, 2: barrier, ...
-        m.Params.LPWarmStart = 2 
-        m.Params.UpdateMode  = 1
-        if verbose==0: m.Params.OutputFlag = 0
-
-        # Objective
-        pi_i_0 = m.addMVar(self.I, lb=0.0)
-        pi_0_j = m.addMVar(self.J, lb=0.0)
-
-        ub_i_y = np.where(self.Y_i_y, grb.GRB.INFINITY, 0.0)      
-        ub_x_j = np.where(self.X_j_x.T, grb.GRB.INFINITY, 0.0)   
-        pi_i_y = m.addMVar((self.I, self.Y), lb=0.0, ub=ub_i_y)
-        pi_x_j = m.addMVar((self.X, self.J), lb=0.0, ub=ub_x_j)
-
-        obj = pi_i_0.T @ self.eps_i_0 + pi_0_j.T @ self.eta_0_j + (pi_i_y * self.alpha_i_y).sum() + (pi_x_j * self.gamma_x_j).sum()
-        m.setObjective(obj, grb.GRB.MAXIMIZE)
-
-        # Row constraints
-        m.addConstr( pi_i_0 + pi_i_y.sum(axis=1) == 1.0 )
-        m.addConstr( pi_0_j + pi_x_j.T.sum(axis=1) == 1.0 )
-
-        # Linking Constraints
-        m.addConstr( self.delta_i_x.T @ pi_i_y == pi_x_j @ self.delta_j_y )
-
-        return m, pi_i_y, pi_x_j
-    
-
-    def find_improved_reduced_cost(self, model, rc_tol=1e-6, verbose=0):
-        '''Ask each agent whether some excluded type beats their current supported utility.'''
-        dual_vals = model.getAttr("Pi", model.getConstrs())[:(self.I + self.J + self.X*self.Y)]
-        u_i = np.array(dual_vals[:self.I])
-        v_j = np.array(dual_vals[self.I:self.I+self.J])
-        t_x_y = np.array(dual_vals[self.I+self.J:self.I+self.J+self.X*self.Y]).reshape((self.X,self.Y))
-
-        new_columns_i_y, new_columns_j_x = [], []
-
-        for i in range(self.I):
-            best_rc, best_y = -np.inf, None
-            for y in range(self.Y):
-                if y not in self.Y_i_y[i,:].nonzero()[0]:
-                    rc = self.alpha_i_y[i,y] - self.delta_i_x[i,:] @ t_x_y[:,y] - u_i[i]
-                    #if rc > rc_tol:
-                    #    Y_i[i,y] = 1
-                    #    new_columns_i_y.append((i,y))
-                    if rc > best_rc:
-                        best_rc, best_y = rc, y
-                    if verbose>1: print(f"Agent i={i}, type y={y}. Reduced cost: {float(rc):.2f}.")
-
-            if best_rc > rc_tol:
-                self.Y_i_y[i,best_y] = 1
-                new_columns_i_y.append((i,best_y))
-                if verbose>0: print(f"Type y={best_y} entered choice set of i={i}. Reduced cost: {float(best_rc):.2f}.")
-
-        for j in range(self.J):
-            best_rc, best_x = -np.inf, None
-            for x in range(self.X):
-                if x not in self.X_j_x[j].nonzero()[0]:
-                    rc = self.gamma_x_j[x,j] + self.delta_j_y[j,:] @ t_x_y[x,:].T - v_j[j]
-                    #if rc > rc_tol:
-                    #    X_j[j,x] = 1
-                    #    new_columns_j_x.append((j,x))
-                    if rc > best_rc:
-                        best_rc, best_x = rc, x
-                    if verbose>1: print(f"Agent j={j}, type x={x}. Reduced cost: {float(rc):.2f}.")
-
-            if best_rc > rc_tol:
-                self.X_j_x[j,best_x] = 1
-                new_columns_j_x.append((j,best_x))
-                if verbose>0: print(f"Type x={best_x} entered choice set of j={j}. Reduced cost: {float(best_rc):.2f}.")
-
-        return new_columns_i_y, new_columns_j_x
-
-    def update_rmp(self, model, new_columns_i_y, new_columns_j_x, pi_i_y, pi_x_j):
-        '''Open the newly desired type options inside the restricted market.'''
-        for (i, y) in new_columns_i_y:
-            pi_i_y[i, y].UB = grb.GRB.INFINITY
-        for (j, x) in new_columns_j_x:
-            pi_x_j[x, j].UB = grb.GRB.INFINITY
-        return
-    
-    def rroa_solve(self, max_iter=100, rc_tol=1e-6, verbose=0):
-        '''Expand choice sets until no agent wants a missing type at the current transfers.'''
-        start_time = time.perf_counter()  # Add timing
-        total_lp_iterations = 0           # Track LP iterations
-
-        rmp, pi_i_y, pi_x_j = self.build_rmp()
-        build_time = time.perf_counter() - start_time 
-
-        rmp.Params.OutputFlag = 0
-        rmp.optimize()
-
-        total_lp_iterations += rmp.IterCount  # Count initial solve
-        history = [rmp.ObjVal]
-        if verbose > 0:
-            print(f"Iter 0: obj = {rmp.ObjVal:.6f}  (initial BFS)")
-
-        rmp.setParam("Presolve", 0)
-
-        for k in range(max_iter):
-            new_columns_i_y, new_columns_j_x = self.find_improved_reduced_cost(rmp, rc_tol=rc_tol)
-
-            if not new_columns_i_y and not new_columns_j_x:     # stop condition
-                if verbose > 0:
-                    print(f"Iter {k+1:2d}: no positive reduced cost – optimal.")
-                break
-
-            self.update_rmp(rmp, new_columns_i_y, new_columns_j_x, pi_i_y, pi_x_j)
-
-            # primal_var = rmp.getVars()
-            # last_sol = rmp.getAttr("X", primal_var)
-            # rmp.setAttr("Start", primal_var, last_sol)
-            rmp.optimize()
-            if verbose:
-                print("====")
-                print(rmp.ObjVal)
-            total_lp_iterations += rmp.IterCount  # Count iterations
-            history.append(rmp.ObjVal)
-
-        total_time = time.perf_counter() - start_time
-        total_vars = int(self.I + self.J + self.X_j_x.sum() + self.Y_i_y.sum())
-
-        return history, total_time, total_vars, total_lp_iterations, rmp, build_time
 
 class TUMatching:
     
@@ -236,9 +33,13 @@ class TUMatching:
         
         self.alpha_i_y = Phi_x_y[self.x_i,:] / 2 + eps_i_y
         self.gamma_x_j = Phi_x_y[:,self.y_j] / 2 + eta_x_j
+        self.first_j_by_y = np.full(self.Y, -1, dtype=int)
+        for j, y in enumerate(self.y_j):
+            if self.first_j_by_y[y] == -1:
+                self.first_j_by_y[y] = j
         
-        self.Y_i_y = {i: set() for i in range(self.I)}
-        self.X_j_x = {j: set() for j in range(self.J)}
+        self.Y_i_y = np.zeros((self.I, self.Y), dtype=bool)
+        self.X_j_x = np.zeros((self.J, self.X), dtype=bool)
         
         
     def gurobi_solve(self, verbose=0):
@@ -278,13 +79,11 @@ class TUMatching:
     def basic_feasible_solution(self, verbose=0):
         '''Seed the restricted market with one representative man per type who can meet any woman type.'''
         for y in range(self.Y):
-            j = 0
-            while j < self.J and self.y_j[j] != y:
-                j += 1
-            if j == self.J:
+            j = self.first_j_by_y[y]
+            if j == -1:
                 raise ValueError(f"No man of type y = {y}")
-            self.X_j_x[j] = set(range(self.X))
-            if (verbose > 0):
+            self.X_j_x[j, :] = True
+            if verbose > 0:
                 print(f"Type y = {y}: designated j_{y} = {j}")
                 
                 
@@ -297,30 +96,40 @@ class TUMatching:
         m.setObjective(0, grb.GRB.MAXIMIZE)
 
         row_i, row_j, linking_x_y = {}, {}, {}
+        for x in range(self.X):
+            for y in range(self.Y):
+                linking_x_y[x, y] = m.addConstr(grb.LinExpr() == 0.0, name=f"linking_{x}_{y}")
 
         pi_i_0, pi_i_y = {}, {}
         for i in range(self.I):
             pi_i_0[i] = m.addVar(obj=self.eps_i_0[i], lb=0.0)
             row_i[i] = m.addConstr(pi_i_0[i] == 1.0, name=f"row_i_{i}")
-            for y in self.Y_i_y[i]:
-                col = grb.Column()
-                col.addTerms(1.0, row_i[i])
-                pi_i_y[i,y] = m.addVar(obj=self.alpha_i_y[i,y], lb=0.0, column=col, name=f"L_{i}_{y}")
+        active_i, active_y = np.nonzero(self.Y_i_y)
+        for i, y in zip(active_i, active_y):
+            x = self.x_i[i].item()
+            col = grb.Column()
+            col.addTerms(1.0, row_i[i])
+            col.addTerms(1.0, linking_x_y[x, y])
+            pi_i_y[i,y] = m.addVar(obj=self.alpha_i_y[i,y], lb=0.0, column=col, name=f"L_{i}_{y}")
 
         pi_0_j, pi_x_j = {}, {}
         for j in range(self.J):
             pi_0_j[j] = m.addVar(obj=self.eta_0_j[j], lb=0.0)
             row_j[j] = m.addConstr(pi_0_j[j] == 1.0, name=f"row_j_{j}")
+        active_j, active_x = np.nonzero(self.X_j_x)
+        for j, x in zip(active_j, active_x):
             y = self.y_j[j].item()
-            for x in self.X_j_x[j]:
-                col = grb.Column()
-                col.addTerms(1.0, row_j[j])
-                pi_x_j[x,j] = m.addVar(obj=self.gamma_x_j[x,j], lb=0.0, column=col, name=f"R_{x}_{j}")
-                linking_x_y[x,y] = m.addConstr(-pi_x_j[x,j] == 0.0, name=f"linking_{x}_{y}")
+            col = grb.Column()
+            col.addTerms(1.0, row_j[j])
+            col.addTerms(-1.0, linking_x_y[x, y])
+            pi_x_j[x,j] = m.addVar(obj=self.gamma_x_j[x,j], lb=0.0, column=col, name=f"R_{x}_{j}")
 
         self.pi_i_0, self.pi_i_y = pi_i_0, pi_i_y
         self.pi_0_j, self.pi_x_j = pi_0_j, pi_x_j
         self.row_i, self.row_j, self.linking_x_y = row_i, row_j, linking_x_y
+        self.linking_keys_xy = list(linking_x_y.keys())
+        self.linking_constrs_xy = [linking_x_y[xy] for xy in self.linking_keys_xy]
+        self.linking_x_idx, self.linking_y_idx = map(np.array, zip(*self.linking_keys_xy))
         self.m = m
 
         return m
@@ -329,35 +138,18 @@ class TUMatching:
     def find_improved_reduced_cost(self, rc_tol=1e-6, verbose=0, topk=1):
         '''Ask each agent which excluded type would most improve their supported utility.'''
     
-        u = np.array(self.m.getAttr("Pi", list(self.row_i.values())))  # (I,)
-        v = np.array(self.m.getAttr("Pi", list(self.row_j.values())))  # (J,)
+        u_i = np.array(self.m.getAttr("Pi", list(self.row_i.values())))  # (I,)
+        v_j = np.array(self.m.getAttr("Pi", list(self.row_j.values())))  # (J,)
 
-        # Build t[x,y] from linking constraints.
-        keys = list(self.linking_x_y.keys())  
-        if keys:
-            pis = np.array(self.m.getAttr("Pi", [self.linking_x_y[k] for k in keys]))
-            xs, ys = zip(*keys)
-            t_x_y = np.zeros((self.X, self.Y), dtype=np.float32)
-            t_x_y[np.array(xs), np.array(ys)] = pis
-        else:
-            t_x_y = np.zeros((self.X, self.Y), dtype=np.float32)
+        t_x_y = np.zeros((self.X, self.Y), dtype=np.float32)
+        t_xy = np.array(self.m.getAttr("Pi", self.linking_constrs_xy))
+        t_x_y[self.linking_x_idx, self.linking_y_idx] = t_xy
 
-        
-        chosen_i_y = np.zeros((self.I, self.Y), dtype=bool)
-        for i, S in self.Y_i_y.items():
-            if S:
-                chosen_i_y[i, list(S)] = True
+        rc_i = self.alpha_i_y.astype(np.float32) - t_x_y[self.x_i, :] - u_i[:, None]
+        rc_i[self.Y_i_y] = -np.inf  # Block columns already in RMP
 
-        chosen_x_j = np.zeros((self.X, self.J), dtype=bool)
-        for j, S in self.X_j_x.items():
-            if S:
-                chosen_x_j[list(S), j] = True
-
-        rc_i = self.alpha_i_y.astype(np.float32) - t_x_y[self.x_i, :] - u[:, None]
-        rc_i[chosen_i_y] = -np.inf  # Block columns already in RMP
-
-        rc_j = self.gamma_x_j.astype(np.float32) + t_x_y[:, self.y_j] - v[None, :]
-        rc_j[chosen_x_j] = -np.inf
+        rc_j = self.gamma_x_j.astype(np.float32) + t_x_y[:, self.y_j] - v_j[None, :]
+        rc_j[self.X_j_x.T] = -np.inf
 
         new_columns_i_y, new_columns_j_x = [], []
 
@@ -368,7 +160,7 @@ class TUMatching:
             add_i = np.where(best_rc_i > rc_tol)[0]
             for i in add_i:
                 y = int(best_y[i])
-                self.Y_i_y[i].add(y)
+                self.Y_i_y[i, y] = True
                 new_columns_i_y.append((i, y))
                 if verbose > 1:
                     print(f"i={i}: add y={y}, rc={best_rc_i[i]:.3g}")
@@ -382,7 +174,7 @@ class TUMatching:
                 for i, y in zip(idx_i, idx_y):
                     if seen[i] >= topk:
                         continue
-                    self.Y_i_y[i].add(int(y))
+                    self.Y_i_y[int(i), int(y)] = True
                     new_columns_i_y.append((int(i), int(y)))
                     seen[i] += 1
 
@@ -392,7 +184,7 @@ class TUMatching:
             add_j = np.where(best_rc_j > rc_tol)[0]
             for j in add_j:
                 x = int(best_x[j])
-                self.X_j_x[j].add(x)
+                self.X_j_x[j, x] = True
                 new_columns_j_x.append((j, x))
                 if verbose > 1:
                     print(f"j={j}: add x={x}, rc={best_rc_j[j]:.3g}")
@@ -405,7 +197,7 @@ class TUMatching:
                 for x, j in zip(idx_x, idx_j):
                     if seen[j] >= topk:
                         continue
-                    self.X_j_x[int(j)].add(int(x))
+                    self.X_j_x[int(j), int(x)] = True
                     new_columns_j_x.append((int(j), int(x)))
                     seen[j] += 1
 
@@ -468,25 +260,34 @@ class TUMatching:
             history.append(self.m.ObjVal)
 
         total_time = time.perf_counter() - start_time
-        total_vars = int(self.I + self.J + sum(len(s) for s in self.X_j_x.values()) + sum(len(s) for s in self.Y_i_y.values()))
-
+        total_vars = int(self.I + self.J + self.X_j_x.sum() + self.Y_i_y.sum())
+ß
         return history, total_time, total_vars, total_lp_iterations, build_time, self.m
 
 
-# TUMatchingEstimation class: reverse problem, dictionary approach.
 
 class TUMatchingEstimation:
 
     def __init__(self, mu_x_y, mu_x0, mu_0y, phi_x_y_k, eps_i_0=None, eta_0_j=None, eps_i_y=None, eta_x_j=None, seed=0):
-        self.I, self.J = len(eps_i_0), len(eta_0_j)
+        mu_x_y = _as_integer_counts("mu_x_y", mu_x_y)
+        mu_x0 = _as_integer_counts("mu_x0", mu_x0)
+        mu_0y = _as_integer_counts("mu_0y", mu_0y)
+        phi_x_y_k = np.asarray(phi_x_y_k)
         self.X, self.Y, self.K = phi_x_y_k.shape
+        if mu_x_y.shape != (self.X, self.Y):
+            raise ValueError("mu_x_y must have shape (X, Y).")
+        if mu_x0.shape != (self.X,):
+            raise ValueError("mu_x0 must have shape (X,).")
+        if mu_0y.shape != (self.Y,):
+            raise ValueError("mu_0y must have shape (Y,).")
 
-        self.mu_x_y = mu_x_y
+        self.mu_x_y, self.mu_x0, self.mu_0y = mu_x_y, mu_x0, mu_0y
         self.phi_x_y_k = phi_x_y_k
 
         # construct an individual matching pi_i_y and pi_x_j consistent with aggregate mu_x_y, mu_x0, mu_0y
         n_x = mu_x_y.sum(axis=1) + mu_x0
         m_y = mu_x_y.sum(axis=0) + mu_0y
+        self.I, self.J = int(n_x.sum()), int(m_y.sum())
         
         x_i = np.repeat(np.arange(self.X), n_x) # repeat 0 times n_x[0], 1 times n_x[1], etc.
         y_j = np.repeat(np.arange(self.Y), m_y)
@@ -527,11 +328,13 @@ class TUMatchingEstimation:
         if eta_x_j is None:
             self.eta_x_j = np.random.normal(0, 1, size=(self.X,self.J)) / 10
 
-        self.Y_i_y = {i: set() for i in range(self.I)}  # None for singles?
-        self.X_j_x = {j: set() for j in range(self.J)}
+        self.Y_i_y = np.zeros((self.I, self.Y), dtype=bool)
+        self.X_j_x = np.zeros((self.J, self.X), dtype=bool)
+        self.active_i_0 = np.zeros(self.I, dtype=bool)
+        self.active_0_j = np.zeros(self.J, dtype=bool)
 
 
-    def unrestricted_solve(self, verbose=0):
+    def gurobi_solve(self, verbose=0):
         '''Solve the simulated inverse market with moment prices chosen to support the observed matching.'''
         t_start = time.perf_counter()
 
@@ -571,37 +374,42 @@ class TUMatchingEstimation:
         idx_i_by_x = [list(np.where(self.x_i == x)[0]) for x in range(self.X)]
         idx_j_by_y = [list(np.where(self.y_j == y)[0]) for y in range(self.Y)]
 
+        self.Y_i_y[:, :] = False
+        self.X_j_x[:, :] = False
+        self.active_i_0[:] = False
+        self.active_0_j[:] = False
+
         for x in range(self.X):
             for y in range(self.Y):
                 c = int(self.mu_x_y[x, y])
                 for _ in range(c):
                     i = idx_i_by_x[x].pop()
                     j = idx_j_by_y[y].pop()
-                    self.Y_i_y[i].add(y)
-                    self.X_j_x[j].add(x)
+                    self.Y_i_y[i, y] = True
+                    self.X_j_x[j, x] = True
                     
         for x in range(self.X):
             for i in idx_i_by_x[x]:
-                self.Y_i_y[i].add(None)
+                self.active_i_0[i] = True
         for y in range(self.Y):
             for j in idx_j_by_y[y]:
-                self.X_j_x[j].add(None)
+                self.active_0_j[j] = True
                 
-        counter = self.K + self.X*self.Y
+        num_extra_singles = self.K + self.X*self.Y
         i = 0
-        while counter > 0 and i < self.I:
-            if None not in self.Y_i_y[i]:
-                self.Y_i_y[i].add(None)
-                counter -= 1
+        while num_extra_singles > 0 and i < self.I:
+            if not self.active_i_0[i]:
+                self.active_i_0[i] = True
+                num_extra_singles -= 1
             i += 1
         j = 0
-        while counter > 0 and j < self.J:
-            if None not in self.X_j_x[j]:
-                self.X_j_x[j].add(None)
-                counter -= 1
+        while num_extra_singles > 0 and j < self.J:
+            if not self.active_0_j[j]:
+                self.active_0_j[j] = True
+                num_extra_singles -= 1
             j += 1
-        if counter > 0:
-            print(f"Not enough variables to activate.")
+        if num_extra_singles > 0:
+            raise ValueError("Not enough inactive singlehood columns to complete the initial basis.")
         return
 
   
@@ -614,75 +422,63 @@ class TUMatchingEstimation:
         m.setObjective(0, grb.GRB.MAXIMIZE)
 
         row_i, row_j, linking_x_y, linking_k = {}, {}, {}, {}
-
-        lambda_i_0, lambda_i_y = {}, {}
-        for i in range(self.I):  # individual constraints i
-            if len(self.Y_i_y[i]) == 1:
-                y = next(iter(self.Y_i_y[i]))
-                if y is None:
-                    lambda_i_0[i] = m.addVar(obj=self.eps_i_0[i], lb=0.0)
-                    row_i[i] = m.addConstr(lambda_i_0[i] == 1.0, name=f"row_i_{i}")
-                else:
-                    lambda_i_y[i, y] = m.addVar(obj=self.eps_i_y[i, y], lb=0.0, name=f"L_{i}_{y}")
-                    row_i[i] = m.addConstr(lambda_i_y[i, y] == 1.0, name=f"row_i_{i}")
-            else:  # in this case None is necessarily in the set
-                lambda_i_0[i] = m.addVar(obj=self.eps_i_0[i], lb=0.0)
-                row_i[i] = m.addConstr(lambda_i_0[i] == 1.0, name=f"row_i_{i}")
-                y = next(iter(self.Y_i_y[i] - set({None})))
-                col = grb.Column()
-                col.addTerms(1.0, row_i[i])
-                lambda_i_y[i, y] = m.addVar(obj=self.eps_i_y[i, y], lb=0.0, column=col, name=f"L_{i}_{y}")
-
-        lambda_0_j, lambda_x_j = {}, {}
-        for j in range(self.J):  # individual constraints j
-            if len(self.X_j_x[j]) == 1:
-                x = next(iter(self.X_j_x[j]))
-                if x is None:
-                    lambda_0_j[j] = m.addVar(obj=self.eta_0_j[j], lb=0.0)
-                    row_j[j] = m.addConstr(lambda_0_j[j] == 1.0, name=f"row_j_{j}")
-                else:
-                    lambda_x_j[x, j] = m.addVar(obj=self.eta_x_j[x, j], lb=0.0, name=f"R_{x}_{j}")
-                    row_j[j] = m.addConstr(lambda_x_j[x, j] == 1.0, name=f"row_j_{j}")
-            else:  # in this case None is necessarily in the set
-                lambda_0_j[j] = m.addVar(obj=self.eta_0_j[j], lb=0.0)
-                row_j[j] = m.addConstr(lambda_0_j[j] == 1.0, name=f"row_j_{j}")
-                x = next(iter(self.X_j_x[j] - set({None})))
-                col = grb.Column()
-                col.addTerms(1.0, row_j[j])
-                lambda_x_j[x, j] = m.addVar(obj=self.eta_x_j[x, j], lb=0.0, column=col, name=f"R_{x}_{j}")
-
+        for i in range(self.I):
+            row_i[i] = m.addConstr(grb.LinExpr() == 1.0, name=f"row_i_{i}")
+        for j in range(self.J):
+            row_j[j] = m.addConstr(grb.LinExpr() == 1.0, name=f"row_j_{j}")
         for x in range(self.X):
             for y in range(self.Y):
-                lhs = grb.LinExpr()
-                for i in range(self.I):
-                    if self.x_i[i] == x and (i, y) in lambda_i_y:
-                        lhs += lambda_i_y[i, y]
-                for j in range(self.J):
-                    if self.y_j[j] == y and (x, j) in lambda_x_j:
-                        lhs -= lambda_x_j[x, j]
-                linking_x_y[x, y] = m.addConstr(lhs == 0.0, name=f"linking_{x}_{y}")
+                linking_x_y[x, y] = m.addConstr(grb.LinExpr() == 0.0, name=f"linking_{x}_{y}")
 
+        lambda_i_0, lambda_i_y = {}, {}
+        lambda_0_j, lambda_x_j = {}, {}
+
+        rhs_k = (self.phi_x_y_k * self.mu_x_y[:, :, None]).sum(axis=(0, 1))
         self.linking_k_list = []
-        for k in range(self.K):  # linking constraints k
-            lhs = grb.LinExpr()
-            for i in range(self.I):
-                ys = [y for y in self.Y_i_y[i] if y is not None]
-                if len(ys) == 1:
-                    y = ys[0]
-                    lhs += lambda_i_y[i, y] * self.phi_x_y_k[self.x_i[i], y, k] / 2
-            for j in range(self.J):
-                xs = [x for x in self.X_j_x[j] if x is not None]
-                if len(xs) == 1:
-                    x = xs[0]
-                    lhs += lambda_x_j[x, j] * self.phi_x_y_k[x, self.y_j[j], k] / 2
-            rhs = ((self.phi_x_y_k * self.mu_x_y[:, :, None]).sum(axis=(0, 1)))[k]
-            constr = m.addConstr(lhs == rhs)
+        for k in range(self.K):
+            constr = m.addConstr(grb.LinExpr() == rhs_k[k], name=f"linking_{k}")
             linking_k[k] = constr
             self.linking_k_list.append(constr)
+
+        for i in np.flatnonzero(self.active_i_0):
+            col = grb.Column()
+            col.addTerms(1.0, row_i[i])
+            lambda_i_0[i] = m.addVar(obj=self.eps_i_0[i], lb=0.0, column=col, name=f"L_{i}_0")
+
+        active_i, active_y = np.nonzero(self.Y_i_y)
+        for i, y in zip(active_i, active_y):
+            x = int(self.x_i[i])
+            col = grb.Column()
+            col.addTerms(1.0, row_i[i])
+            col.addTerms(1.0, linking_x_y[x, y])
+            for k in range(self.K):
+                col.addTerms(self.phi_x_y_k[x, y, k] / 2, linking_k[k])
+            lambda_i_y[i, y] = m.addVar(obj=self.eps_i_y[i, y], lb=0.0, column=col, name=f"L_{i}_{y}")
+
+        for j in np.flatnonzero(self.active_0_j):
+            col = grb.Column()
+            col.addTerms(1.0, row_j[j])
+            lambda_0_j[j] = m.addVar(obj=self.eta_0_j[j], lb=0.0, column=col, name=f"R_0_{j}")
+
+        active_j, active_x = np.nonzero(self.X_j_x)
+        for j, x in zip(active_j, active_x):
+            y = int(self.y_j[j])
+            col = grb.Column()
+            col.addTerms(1.0, row_j[j])
+            col.addTerms(-1.0, linking_x_y[x, y])
+            for k in range(self.K):
+                col.addTerms(self.phi_x_y_k[x, y, k] / 2, linking_k[k])
+            lambda_x_j[x, j] = m.addVar(obj=self.eta_x_j[x, j], lb=0.0, column=col, name=f"R_{x}_{j}")
 
         self.lambda_i_0, self.lambda_i_y = lambda_i_0, lambda_i_y
         self.lambda_0_j, self.lambda_x_j = lambda_0_j, lambda_x_j
         self.row_i, self.row_j, self.linking_x_y, self.linking_k = row_i, row_j, linking_x_y, linking_k
+        self.row_i_list = [row_i[i] for i in range(self.I)]
+        self.row_j_list = [row_j[j] for j in range(self.J)]
+        self.linking_keys_xy = list(linking_x_y.keys())
+        self.linking_constrs_xy = [linking_x_y[xy] for xy in self.linking_keys_xy]
+        self.linking_x_idx, self.linking_y_idx = map(np.array, zip(*self.linking_keys_xy))
+        self.linking_k_list = [linking_k[k] for k in range(self.K)]
         self.m = m
 
         return m
@@ -694,104 +490,88 @@ class TUMatchingEstimation:
   
     def find_improved_reduced_cost(self, rc_tol=1e-6, verbose=0):
         '''Ask simulated agents whether missing choices improve utility at current transfers and moment prices.'''
-        u_i = {i: self.row_i[i].Pi for i in range(self.I)}
-        v_j = {j: self.row_j[j].Pi for j in range(self.J)}
+        u_i = np.array(self.m.getAttr("Pi", self.row_i_list))
+        v_j = np.array(self.m.getAttr("Pi", self.row_j_list))
         t_x_y = np.zeros((self.X, self.Y)) # matrix access is faster than dictionary for this size
-        for a in self.linking_x_y:
-            t_x_y[a] = self.linking_x_y[a].Pi
-        lambda_k = -np.array([self.linking_k[k].Pi for k in range(self.K)])
-
-        new_columns_i_y, new_columns_j_x = [], []
+        t_xy = np.array(self.m.getAttr("Pi", self.linking_constrs_xy))
+        t_x_y[self.linking_x_idx, self.linking_y_idx] = t_xy
+        lambda_k = -np.array(self.m.getAttr("Pi", self.linking_k_list))
 
         Phi_lambda_x_y = self.phi_x_y_k @ lambda_k
 
-        Y_i_y_cached = self.Y_i_y
-        U_i_y_cached = self.delta_i_x @ (Phi_lambda_x_y / 2 - t_x_y) + self.eps_i_y
-        for i in range(self.I):
-            x = self.x_i[i].item()
-            Y_i = np.ones(self.Y, dtype=bool)
-            single_flag = True
-            for y in Y_i_y_cached[i]:
-                if y is None:
-                    single_flag = False
-                else:
-                    Y_i[y] = False
-            best_rc = -np.inf
-            best_y = None
-            if Y_i.any() > 0:
-                rc_y = U_i_y_cached[i,Y_i] - u_i[i]
-                best_idx = np.argmax(rc_y)
-                best_rc = rc_y[best_idx]
-                best_y = np.arange(self.Y)[Y_i][best_idx]
-            if single_flag:
-                rc_0 = self.eps_i_0[i] - u_i[i]
-                if rc_0 > best_rc:
-                    best_rc = rc_0
-                    best_y = None
-            if best_rc > rc_tol:
-                self.Y_i_y[i].add(best_y)
-                new_columns_i_y.append((i,best_y))
-                if verbose > 1: print(f"Type y={best_y} entered choice set of i={i}. Reduced cost: {best_rc:.2f}.")
+        u_i_y = Phi_lambda_x_y[self.x_i, :] / 2 - t_x_y[self.x_i, :] + self.eps_i_y
+        rc_i_y = u_i_y - u_i[:, None]
+        rc_i_y[self.Y_i_y] = -np.inf
+        y_star_i = rc_i_y.argmax(axis=1)
+        best_rc_i = rc_i_y[np.arange(self.I), y_star_i]
 
-        X_j_x_cached = self.X_j_x
-        V_x_j_cached = (Phi_lambda_x_y / 2 + t_x_y) @ self.delta_j_y.T + self.eta_x_j
-        for j in range(self.J):
-            y = self.y_j[j].item()
-            X_j = np.ones(self.X, dtype=bool)
-            single_flag = True
-            for x in X_j_x_cached[j]:
-                if x is None:
-                    single_flag = False
-                else:
-                    X_j[x] = False
-            best_rc = -np.inf
-            best_x = None
-            if X_j.any() > 0:
-                rc_x = V_x_j_cached[X_j,j] - v_j[j]
-                best_idx = np.argmax(rc_x)
-                best_rc = rc_x[best_idx]
-                best_x = np.arange(self.X)[X_j][best_idx]
-            if single_flag:
-                rc_0 = self.eta_0_j[j] - v_j[j]
-                if rc_0 > best_rc:
-                    best_rc = rc_0
-                    best_x = None
-            if best_rc > rc_tol:
-                self.X_j_x[j].add(best_x)
-                new_columns_j_x.append((j,best_x))
-                if verbose > 1: print(f"Type x={best_x} entered choice set of j={j}. Reduced cost: {best_rc:.2f}.")
+        rc_i_0 = self.eps_i_0 - u_i
+        use_i_0 = (~self.active_i_0) & (rc_i_0 > best_rc_i)
 
-        return new_columns_i_y, new_columns_j_x
+        add_i = np.flatnonzero((~use_i_0) & (best_rc_i > rc_tol))
+        add_y = y_star_i[add_i].astype(int)
+        self.Y_i_y[add_i, add_y] = True
+        new_columns_i_y = list(zip(add_i.astype(int).tolist(), add_y.tolist()))
+        add_i_0 = np.flatnonzero(use_i_0 & (rc_i_0 > rc_tol)).astype(int)
+        self.active_i_0[add_i_0] = True
+        new_columns_i_0 = add_i_0.tolist()
+        if verbose > 1:
+            for i, y in new_columns_i_y:
+                print(f"Type y={y} entered choice set of i={i}. Reduced cost: {best_rc_i[i]:.2f}.")
+            for i in new_columns_i_0:
+                print(f"Singlehood entered choice set of i={i}. Reduced cost: {rc_i_0[i]:.2f}.")
+
+        v_x_j = Phi_lambda_x_y[:, self.y_j] / 2 + t_x_y[:, self.y_j] + self.eta_x_j
+        rc_x_j = v_x_j - v_j[None, :]
+        rc_x_j[self.X_j_x.T] = -np.inf
+        x_star_j = rc_x_j.argmax(axis=0)
+        best_rc_j = rc_x_j[x_star_j, np.arange(self.J)]
+
+        rc_0_j = self.eta_0_j - v_j
+        use_0_j = (~self.active_0_j) & (rc_0_j > best_rc_j)
+
+        add_j = np.flatnonzero((~use_0_j) & (best_rc_j > rc_tol))
+        add_x = x_star_j[add_j].astype(int)
+        self.X_j_x[add_j, add_x] = True
+        new_columns_j_x = list(zip(add_j.astype(int).tolist(), add_x.tolist()))
+        add_0_j = np.flatnonzero(use_0_j & (rc_0_j > rc_tol)).astype(int)
+        self.active_0_j[add_0_j] = True
+        new_columns_0_j = add_0_j.tolist()
+        if verbose > 1:
+            for j, x in new_columns_j_x:
+                print(f"Type x={x} entered choice set of j={j}. Reduced cost: {best_rc_j[j]:.2f}.")
+            for j in new_columns_0_j:
+                print(f"Singlehood entered choice set of j={j}. Reduced cost: {rc_0_j[j]:.2f}.")
+
+        return new_columns_i_y, new_columns_i_0, new_columns_j_x, new_columns_0_j
 
   
-    def update_rmp(self, new_columns_i_y, new_columns_j_x):
+    def update_rmp(self, new_columns_i_y, new_columns_i_0, new_columns_j_x, new_columns_0_j):
         '''Add simulated choices that would improve the restricted inverse market.'''
+        for i in new_columns_i_0:
+            col = grb.Column()
+            col.addTerms(1.0, self.row_i[i])
+            self.lambda_i_0[i] = self.m.addVar(obj=self.eps_i_0[i], lb=0.0, column=col, name=f"L_{i}_0")
         for (i, y) in new_columns_i_y:
-            if y is None:
-                col = grb.Column()
-                col.addTerms(1.0, self.row_i[i])
-                self.lambda_i_0[i] = self.m.addVar(obj=self.eps_i_0[i], lb=0.0, column=col)
-            else:
-                x = int(self.x_i[i])
-                col = grb.Column()
-                col.addTerms(1.0, self.row_i[i])
-                col.addTerms(1.0, self.linking_x_y[x,y])
-                for k in range(self.K):
-                    col.addTerms(self.phi_x_y_k[x,y,k]/2, self.linking_k[k])
-                self.lambda_i_y[i,y] = self.m.addVar(obj=self.eps_i_y[i,y], lb=0.0, column=col, name=f"L_{i}_{y}")
+            x = int(self.x_i[i])
+            col = grb.Column()
+            col.addTerms(1.0, self.row_i[i])
+            col.addTerms(1.0, self.linking_x_y[x, y])
+            for k in range(self.K):
+                col.addTerms(self.phi_x_y_k[x, y, k] / 2, self.linking_k[k])
+            self.lambda_i_y[i, y] = self.m.addVar(obj=self.eps_i_y[i, y], lb=0.0, column=col, name=f"L_{i}_{y}")
+        for j in new_columns_0_j:
+            col = grb.Column()
+            col.addTerms(1.0, self.row_j[j])
+            self.lambda_0_j[j] = self.m.addVar(obj=self.eta_0_j[j], lb=0.0, column=col, name=f"R_0_{j}")
         for (j, x) in new_columns_j_x:
-            if x is None:
-                col = grb.Column()
-                col.addTerms(1.0, self.row_j[j])
-                self.lambda_0_j[j] = self.m.addVar(obj=self.eta_0_j[j], lb=0.0, column=col)
-            else:
-                y = int(self.y_j[j])
-                col = grb.Column()
-                col.addTerms(1.0, self.row_j[j])
-                col.addTerms(-1.0, self.linking_x_y[x,y])
-                for k in range(self.K):
-                    col.addTerms(self.phi_x_y_k[x,y,k]/2, self.linking_k[k])
-                self.lambda_x_j[x,j] = self.m.addVar(obj=self.eta_x_j[x,j], lb=0.0, column=col, name=f"R_{x}_{j}")
+            y = int(self.y_j[j])
+            col = grb.Column()
+            col.addTerms(1.0, self.row_j[j])
+            col.addTerms(-1.0, self.linking_x_y[x, y])
+            for k in range(self.K):
+                col.addTerms(self.phi_x_y_k[x, y, k] / 2, self.linking_k[k])
+            self.lambda_x_j[x, j] = self.m.addVar(obj=self.eta_x_j[x, j], lb=0.0, column=col, name=f"R_{x}_{j}")
         return
 
   
@@ -834,14 +614,14 @@ class TUMatchingEstimation:
         self.m.Params.LPWarmStart = 2
 
         for iter in range(max_iter):
-            new_columns_i_y, new_columns_j_x = self.find_improved_reduced_cost(rc_tol=rc_tol)
+            new_columns_i_y, new_columns_i_0, new_columns_j_x, new_columns_0_j = self.find_improved_reduced_cost(rc_tol=rc_tol)
 
-            if not new_columns_i_y and not new_columns_j_x:  # stop condition
+            if not new_columns_i_y and not new_columns_i_0 and not new_columns_j_x and not new_columns_0_j:  # stop condition
                 if verbose > 0:
                     print(f"Iter {iter + 1:2d}: no positive reduced cost – optimal.")
                 break
 
-            self.update_rmp(new_columns_i_y, new_columns_j_x)
+            self.update_rmp(new_columns_i_y, new_columns_i_0, new_columns_j_x, new_columns_0_j)
 
             self.m.optimize()
             if verbose > 0:
@@ -851,7 +631,7 @@ class TUMatchingEstimation:
             history.append(self.m.ObjVal)
 
         total_time = time.perf_counter() - start_time
-        total_vars = int(sum(len(s) for s in self.X_j_x.values()) + sum(len(s) for s in self.Y_i_y.values()))
+        total_vars = int(self.active_i_0.sum() + self.active_0_j.sum() + self.Y_i_y.sum() + self.X_j_x.sum())
 
         return history, total_time, total_vars, total_lp_iterations, build_time
 
