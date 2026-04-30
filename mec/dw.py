@@ -31,8 +31,8 @@ class TUMatching:
         self.x_i, self.y_j = delta_i_x.argmax(axis=1), delta_j_y.argmax(axis=1)
         self.delta_i_x, self.delta_j_y = sp.csr_matrix(delta_i_x), sp.csr_matrix(delta_j_y)
         
-        self.alpha_i_y = Phi_x_y[self.x_i,:] / 2 + eps_i_y
-        self.gamma_x_j = Phi_x_y[:,self.y_j] / 2 + eta_x_j
+        self.alpha_i_y = (Phi_x_y[self.x_i,:] / 2 + eps_i_y).astype(np.float32)
+        self.gamma_x_j = (Phi_x_y[:,self.y_j] / 2 + eta_x_j).astype(np.float32)
         self.first_j_by_y = np.full(self.Y, -1, dtype=int)
         for j, y in enumerate(self.y_j):
             if self.first_j_by_y[y] == -1:
@@ -145,10 +145,10 @@ class TUMatching:
         t_xy = np.array(self.m.getAttr("Pi", self.linking_constrs_xy))
         t_x_y[self.linking_x_idx, self.linking_y_idx] = t_xy
 
-        rc_i = self.alpha_i_y.astype(np.float32) - t_x_y[self.x_i, :] - u_i[:, None]
+        rc_i = self.alpha_i_y - t_x_y[self.x_i, :] - u_i[:, None]
         rc_i[self.Y_i_y] = -np.inf  # Block columns already in RMP
 
-        rc_j = self.gamma_x_j.astype(np.float32) + t_x_y[:, self.y_j] - v_j[None, :]
+        rc_j = self.gamma_x_j + t_x_y[:, self.y_j] - v_j[None, :]
         rc_j[self.X_j_x.T] = -np.inf
 
         new_columns_i_y, new_columns_j_x = [], []
