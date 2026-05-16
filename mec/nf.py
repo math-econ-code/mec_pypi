@@ -410,7 +410,7 @@ class Bipartite_EQF_problem:
         self.n_x = np.append(self.n_x, mass)
         self.nbx += 1
         self.nbz += 1
-        self.nba = self.nbx*self.nby
+        self.nba += self.nby
         #self.p_z = np.append(self.p_z, np.nan)
         self.digraph.add_nodes_from(['x'+str(len(self.n_x)-1)], bipartite=0)
         self.digraph.add_edges_from([('x'+str(len(self.n_x)-1),'y'+str(y)) for y in range(self.nby)])
@@ -426,7 +426,7 @@ class Bipartite_EQF_problem:
         self.m_y = np.append(self.m_y, mass)
         self.nby += 1
         self.nbz += 1
-        self.nba = self.nbx*self.nby
+        self.nba += self.nbx
         self.p_z = np.append(self.p_z, -np.inf)
         self.digraph.add_nodes_from(['y'+str(y_ent)], bipartite=1)
         self.digraph.add_edges_from([('x'+str(x), 'y'+str(y_ent)) for x in range(self.nbx)])
