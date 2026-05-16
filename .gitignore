@@ -5,3 +5,23 @@
 .idea/misc.xml
 .idea/modules.xml
 .idea/vcs.xml
+
+# Python build / cache
+__pycache__/
+*.pyc
+*.egg-info/
+
+# C build artifacts from mec/c_dw
+*.o
+*.dylib
+*.so
+*.dll
+mec/c_dw/build/
+mec/c_dw/tests/test_dw
+mec/c_dw/tests/test_dw.exe
+
+# Generated benchmark output
+mec/c_dw/bench/*.png
+
+# Gurobi runtime
+gurobi.log
